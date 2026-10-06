@@ -132,6 +132,8 @@ dialog h3{font-size:1.3rem;font-weight:800;margin-bottom:1rem;letter-spacing:-.0
 <script>
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+try { const m = /^#t=([\w.-]+)$/.exec(location.hash); if (m) { localStorage.setItem('lxt', m[1]); history.replaceState(0, '', '/'); } } catch {}
+const getT = () => { try { return localStorage.getItem('lxt'); } catch { return null; } }, setT = (t) => { try { t ? localStorage.setItem('lxt', t) : localStorage.removeItem('lxt'); } catch {} };
 const fmt = (n) => Number(n || 0).toLocaleString('es');
 const IC = {
   grid: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
@@ -152,8 +154,10 @@ let me = null, mode = 'login', view = ['resumen', 'scripts', 'guia'].includes(lo
 let D = { ov: null, list: null }, prov = {};
 
 async function api(p, o = {}) {
-  const r = await fetch(p, { method: o.method || 'GET', headers: { 'Content-Type': 'application/json' }, body: o.body ? JSON.stringify(o.body) : undefined });
+  const r = await fetch(p, { method: o.method || 'GET', headers: { 'Content-Type': 'application/json', ...(getT() ? { Authorization: 'Bearer ' + getT() } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined });
   const j = await r.json().catch(() => ({}));
+  if (j.token) setT(j.token);
+  if (r.status === 401 && !p.startsWith('/api/login') && !p.startsWith('/api/register')) setT(null);
   if (r.status === 401 && me && !p.startsWith('/api/login')) { me = null; authView(); throw new Error('Tu sesión venció, volvé a entrar'); }
   if (!r.ok) throw new Error(j.error || 'Algo salió mal, probá de nuevo');
   return j;
@@ -320,7 +324,7 @@ async function stats(s) {
 const A = {
   nav(_, b) { view = b.dataset.v; history.replaceState(0, '', '#' + view); dash(); },
   new() { editor(); },
-  out: async () => { if (!(await ask('¿Cerrar sesión?', 'Vas a salir de tu cuenta en este dispositivo. Tus scripts y estadísticas quedan guardados.', 'Cerrar sesión'))) return; await api('/api/logout', { method: 'POST' }); me = null; D = { ov: null, list: null }; mode = 'login'; authView(); },
+  out: async () => { if (!(await ask('¿Cerrar sesión?', 'Vas a salir de tu cuenta en este dispositivo. Tus scripts y estadísticas quedan guardados.', 'Cerrar sesión'))) return; try { await api('/api/logout', { method: 'POST' }); } catch {} setT(null); me = null; D = { ov: null, list: null }; mode = 'login'; authView(); },
   copy: (s) => { navigator.clipboard.writeText(s.loadstring).then(() => toast('Loadstring copiado'), () => toast('No pude copiar, seleccionalo a mano', 'err')); },
   stats, edit: editor,
   tog: async (s) => { await api('/api/scripts/' + s.id, { method: 'PATCH', body: { enabled: !s.enabled } }); await load(); paint(); toast(s.enabled ? 'Script pausado' : 'Script activado'); },
