@@ -14,15 +14,19 @@ const PORT = process.env.PORT || 3000;
 const BASE = (process.env.BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : `http://localhost:${PORT}`)).replace(/\/$/, '');
 const BASE_DOMAIN = process.env.BASE_DOMAIN || ''; // opcional: habilita nombre.tudominio.com (requiere wildcard)
 const STRICT = process.env.ANTI_HOOK === 'strict';
-const PROD = BASE.startsWith('https');
+const baseOf = (req) => {
+  if (process.env.BASE_URL) return BASE;
+  const proto = String(req.headers['x-forwarded-proto'] || req.protocol).split(',')[0].trim();
+  return `${proto}://${req.headers['x-forwarded-host'] || req.get('host')}`;
+};
 const MAX_SCRIPTS = 5;
 const RESERVED = ['api', 'auth', 's', 'p', 'www', 'admin', 'lexy', 'login'];
 
 // La base es un archivo SQLite que se crea sola: no hay que configurar nada.
 // Si DB_PATH no se puede usar, cae a ./lexy.db
 const VOL = process.env.RAILWAY_VOLUME_MOUNT_PATH; // Railway lo define solo si agregaste un Volume
-const DB_FILE = process.env.DB_PATH || (VOL ? path.join(VOL, 'lexy.db') : 'lexy.db');
-if (!process.env.DB_PATH && !VOL && process.env.RAILWAY_ENVIRONMENT) console.warn('[!] Sin Volume: los datos se borran en cada deploy. Agregá un Volume al servicio.');
+const DB_FILE = process.env.DB_PATH || (VOL ? path.join(VOL, 'lexy.db') : fs.existsSync('/data') ? '/data/lexy.db' : 'lexy.db');
+if (!process.env.DB_PATH && !VOL && !DB_FILE.startsWith('/data') && process.env.RAILWAY_ENVIRONMENT) console.warn('[!] Sin Volume: los datos se borran en cada deploy. Agregá un Volume al servicio.');
 let db;
 try { fs.mkdirSync(path.dirname(path.resolve(DB_FILE)), { recursive: true }); db = new Database(DB_FILE); }
 catch (e) { console.warn(`[!] No pude abrir ${DB_FILE} (${e.message}). Uso ./lexy.db`); db = new Database('lexy.db'); }
@@ -52,7 +56,7 @@ app.use(helmet({
 }));
 // Fuerza HTTPS en producción
 app.use((req, res, next) => {
-  if (PROD && req.headers['x-forwarded-proto'] === 'http') return res.redirect(301, BASE + req.originalUrl);
+  if (req.headers['x-forwarded-proto'] === 'http' && !/^(localhost|127\.)/.test(req.hostname)) return res.redirect(301, `https://${req.get('host')}${req.originalUrl}`);
   next();
 });
 app.use(express.json({ limit: '600kb' }));
@@ -63,7 +67,7 @@ const lim = (windowMs, max) => rateLimit({ windowMs, max, standardHeaders: true,
 const apiLim = lim(60e3, 120), authLim = lim(10 * 60e3, 40), loadLim = lim(60e3, 120);
 
 /* ---------- Sesión ---------- */
-const setSess = (res, u) => res.cookie('lx', jwt.sign({ id: u.id }, SECRET, { expiresIn: '14d' }), { httpOnly: true, sameSite: 'lax', secure: PROD, maxAge: 14 * 864e5 });
+const setSess = (res, u) => res.cookie('lx', jwt.sign({ id: u.id }, SECRET, { expiresIn: '14d' }), { httpOnly: true, sameSite: 'lax', secure: !!res.req?.secure, maxAge: 14 * 864e5 });
 const auth = (req, res, next) => {
   try {
     const p = jwt.verify(req.cookies.lx, SECRET);
@@ -102,17 +106,22 @@ app.get('/auth/:p', authLim, (req, res) => {
   const o = OA[req.params.p];
   if (!o || !o.id) return res.redirect('/?error=' + encodeURIComponent('Ese método no está configurado'));
   const st = crypto.randomBytes(16).toString('hex');
-  res.cookie('lx_st', st, { httpOnly: true, sameSite: 'lax', secure: PROD, maxAge: 6e5 });
-  res.redirect(o.auth + '?' + new URLSearchParams({ client_id: o.id, redirect_uri: `${BASE}/auth/${req.params.p}/callback`, response_type: 'code', scope: o.scope, state: st }));
+  res.cookie('lx_st', st, { httpOnly: true, sameSite: 'lax', secure: req.secure, maxAge: 6e5 });
+  res.redirect(o.auth + '?' + new URLSearchParams({ client_id: o.id, redirect_uri: `${baseOf(req)}/auth/${req.params.p}/callback`, response_type: 'code', scope: o.scope, state: st }));
 });
 app.get('/auth/:p/callback', authLim, async (req, res) => {
   const o = OA[req.params.p], fail = (m) => res.redirect('/?error=' + encodeURIComponent(m));
   try {
-    if (!o || !req.query.code || req.query.state !== req.cookies.lx_st) return fail('Sesión de login inválida');
+    if (!o || !o.id) return fail('Ese método no está configurado');
+    if (req.query.error) return fail('Cancelaste el inicio de sesión');
+    if (!req.query.code || !req.query.state || req.query.state !== req.cookies.lx_st) return fail('La sesión de login venció, probá de nuevo');
     res.clearCookie('lx_st');
-    const t = await (await fetch(o.token, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: o.id, client_secret: o.secret, grant_type: 'authorization_code', code: req.query.code, redirect_uri: `${BASE}/auth/${req.params.p}/callback` }) })).json();
-    if (!t.access_token) return fail('No se pudo iniciar sesión');
-    const prof = o.map(await (await fetch(o.info, { headers: { Authorization: 'Bearer ' + t.access_token } })).json());
+    const H = { 'User-Agent': 'LexyProtect/1.0', Accept: 'application/json' };
+    const t = await (await fetch(o.token, { method: 'POST', headers: { ...H, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: o.id, client_secret: o.secret || '', grant_type: 'authorization_code', code: req.query.code, redirect_uri: `${baseOf(req)}/auth/${req.params.p}/callback` }) })).json();
+    if (!t.access_token) { console.error('[oauth]', req.params.p, t); return fail(`No se pudo iniciar sesión (${t.error_description || t.error || 'sin respuesta'})`); }
+    const raw = await (await fetch(o.info, { headers: { ...H, Authorization: 'Bearer ' + t.access_token } })).json();
+    const prof = o.map(raw);
+    if (!prof.pid) { console.error('[oauth] perfil', raw); return fail('No pude leer tu perfil'); }
     let u = db.prepare('select * from users where provider=? and pid=?').get(req.params.p, String(prof.pid));
     if (!u) {
       let name = String(prof.name || 'user').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 14) || 'user';
@@ -122,11 +131,11 @@ app.get('/auth/:p/callback', authLim, async (req, res) => {
       u = { id: r.lastInsertRowid };
     }
     setSess(res, u); res.redirect('/');
-  } catch (e) { console.error(e); fail('Error al iniciar sesión'); }
+  } catch (e) { console.error('[oauth]', e); fail('Error al iniciar sesión: ' + e.message); }
 });
 
 /* ---------- API de scripts ---------- */
-const urlFor = (slug) => (BASE_DOMAIN ? `https://${slug}.${BASE_DOMAIN}` : `${BASE}/s/${slug}`);
+const urlFor = (slug, req) => (BASE_DOMAIN ? `https://${slug}.${BASE_DOMAIN}` : `${baseOf(req)}/s/${slug}`);
 const own = (req) => db.prepare('select * from scripts where id=? and user_id=?').get(req.params.id, req.user.id);
 
 app.get('/api/scripts', apiLim, auth, (req, res) => {
@@ -134,7 +143,7 @@ app.get('/api/scripts', apiLim, auth, (req, res) => {
     (select max(ts) from execs where script_id=s.id) last,
     (select count(*) from execs where script_id=s.id) total
     from scripts s where user_id=? order by id desc`).all(req.user.id);
-  res.json(rows.map((r) => ({ ...r, url: urlFor(r.slug), loadstring: `loadstring(game:HttpGet("${urlFor(r.slug)}"))()` })));
+  res.json(rows.map((r) => ({ ...r, url: urlFor(r.slug, req), loadstring: `loadstring(game:HttpGet("${urlFor(r.slug, req)}"))()` })));
 });
 app.post('/api/scripts', apiLim, auth, (req, res) => {
   const slug = String(req.body?.name || '').toLowerCase(), content = req.body?.content;
@@ -249,11 +258,11 @@ function seal(text) {
 
 const he = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Página pública de cada script (como Luarmor): muestra el loadstring, nunca el código
-function landing(res, slug) {
+function landing(req, res, slug) {
   slug = String(slug).toLowerCase();
   const r = db.prepare('select s.enabled, u.username owner, (select count(*) from execs where script_id=s.id) total from scripts s join users u on u.id=s.user_id where s.slug=?').get(slug);
   if (!r) return deny(res, 404);
-  const ls = `loadstring(game:HttpGet("${urlFor(slug)}"))()`;
+  const ls = `loadstring(game:HttpGet("${urlFor(slug, req)}"))()`;
   res.status(200).type('html').set('Cache-Control', 'no-store').send(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${he(slug)} · Lexy Protect</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet"><style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:1.2rem;background:#130d1b;color:#f0e9fa;font:16px/1.55 'Bricolage Grotesque',system-ui,sans-serif}
@@ -273,7 +282,7 @@ ${r.enabled ? `<code id="c">${he(ls)}</code><button id="b">Copiar loadstring</bu
 
 function serve(req, res, slug) {
   if (isBanned(req.cip)) return deny(res);
-  if (isBrowser(req)) return landing(res, slug);
+  if (isBrowser(req)) return landing(req, res, slug);
   const s = db.prepare('select id, enabled, content from scripts where slug=?').get(String(slug).toLowerCase());
   if (!s) return deny(res, 404);
   if (BOT_UA.test(req.headers['user-agent'] || '')) { db.prepare('update scripts set blocked=blocked+1 where id=?').run(s.id); strike(req.cip); return deny(res); }
@@ -299,7 +308,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => (HTML ? res.sendFile(HTML) : res.status(500).type('text').send('Falta el archivo index.html en tu repo de GitHub. Subilo en la raíz, al lado de index.js.')));
 // Diagnóstico rápido: abrí /health en tu link para ver si el servidor y la base andan
 app.get('/health', (req, res) => {
-  try { db.prepare('select 1').get(); res.json({ ok: true, db: 'ok', persistente: !!(process.env.DB_PATH || VOL), url: BASE, google: !!OA.google.id, discord: !!OA.discord.id }); }
+  try { db.prepare('select 1').get(); res.json({ ok: true, db: 'ok', persistente: !!(process.env.DB_PATH || VOL || DB_FILE.startsWith('/data')), url: baseOf(req), google: !!OA.google.id, discord: !!OA.discord.id, redirect_google: `${baseOf(req)}/auth/google/callback`, redirect_discord: `${baseOf(req)}/auth/discord/callback` }); }
   catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 app.use((err, req, res, next) => { console.error('[error]', err); res.status(err.status || 500).json({ error: 'Error del servidor: ' + (err.message || 'desconocido') }); });
