@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#130d1b">
+<title>Lexy Protect · Hosting protegido para tus scripts Lua</title>
+<meta name="description" content="Hosteá tu código Lua, ejecutalo con un loadstring y protegelo del .get, spies y dumpers.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff6fae'/%3E%3Cpath d='M16 6l8 3v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V9z' fill='%23130d1b'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#130d1b;--sf:#1b1226;--rs:#251a33;--ln:#34264a;--tx:#f0e9fa;--mu:#9a8cb3;--ac:#ff6fae;--ac2:#ff8fc2;--ok:#6fe3c1;--er:#ff7a7a;--wa:#ffc46b;--mono:'JetBrains Mono',ui-monospace,Consolas,monospace}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.55 'Bricolage Grotesque',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.5}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+h1,h2,h3,p{margin:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border:1px solid var(--ln);background:var(--sf);border-radius:10px;padding:.55rem .95rem;font-weight:500;transition:border-color .15s,background .15s}
+.btn:hover:not(:disabled){border-color:#5d4486;background:var(--rs)}
+.btn.pri{background:var(--ac);border-color:var(--ac);color:#2a0f1e;font-weight:700}.btn.pri:hover:not(:disabled){background:var(--ac2);border-color:var(--ac2)}
+.btn.ghost{background:transparent}.btn.dng:hover:not(:disabled){border-color:var(--er);color:var(--er)}
+.btn.sm{padding:.35rem .65rem;font-size:.9rem}.btn.w{width:100%;padding:.75rem}
+.btn.load::after{content:"";width:1em;height:1em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(1turn)}}
+.logo{display:flex;align-items:center;gap:.65rem;font-weight:800;font-size:1.25rem;letter-spacing:-.03em}
+.logo i{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:var(--ac);color:var(--bg)}
+/* auth */
+.auth{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);min-height:100vh}
+.brand{padding:clamp(1.5rem,5vw,4rem);display:flex;flex-direction:column;gap:2rem;justify-content:space-between;background:var(--sf);border-right:1px solid var(--ln)}
+.brand h1{font-size:clamp(2.4rem,5vw,4.2rem);line-height:1;font-weight:800;letter-spacing:-.04em;max-width:13ch}
+.brand .lead{color:var(--mu);font-size:1.1rem;max-width:42ch;margin-top:1rem}
+.term{border:1px solid var(--ln);border-radius:12px;background:var(--bg);font:13px/1.9 var(--mono);overflow:hidden}
+.term .th{padding:.55rem 1rem;border-bottom:1px solid var(--ln);color:var(--mu);font-size:12px}
+.term #tl{padding:.6rem 1rem;min-height:11.5rem}
+.ln{display:grid;grid-template-columns:2.6rem minmax(0,1fr) auto;gap:.6rem;white-space:nowrap;animation:in .35s both}
+.ln .m{color:var(--mu)}.ln .u{overflow:hidden;text-overflow:ellipsis}.ln .ok{color:var(--ok)}.ln .no{color:var(--er)}
+@keyframes in{from{opacity:0;transform:translateY(4px)}}
+.bf{color:var(--mu);font-size:.9rem;display:flex;gap:1.5rem;flex-wrap:wrap}
+.side{display:grid;place-items:center;padding:2rem 1.2rem}
+.ca{width:100%;max-width:410px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--sf);border:1px solid var(--ln);border-radius:12px;padding:4px;margin-bottom:1.8rem}
+.seg button{border:0;background:transparent;border-radius:9px;padding:.55rem;color:var(--mu);font-weight:500}
+.seg button[aria-selected=true]{background:var(--rs);color:var(--tx);box-shadow:0 0 0 1px var(--ln)}
+.ca h2{font-size:1.8rem;letter-spacing:-.03em;font-weight:800}.ca .sub{color:var(--mu);margin:.3rem 0 1.4rem}
+.oa{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}.oa .btn svg{flex:none}
+.or{display:flex;align-items:center;gap:.8rem;color:var(--mu);font-size:.85rem;margin:1.3rem 0}.or::before,.or::after{content:"";flex:1;height:1px;background:var(--ln)}
+.fld{margin-bottom:1rem}.fld label{display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:.35rem;color:var(--mu)}
+.inp{position:relative}
+.inp input,.edt input,.edt textarea{width:100%;background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:.7rem .85rem;transition:border-color .15s}
+.inp input:focus,.edt input:focus,.edt textarea:focus{outline:0;border-color:var(--ac)}
+.inp.bad input{border-color:var(--er)}
+.eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--mu);padding:.4rem;border-radius:8px;display:grid}.eye:hover{color:var(--tx)}
+.msg{font-size:.85rem;min-height:1.1rem;margin-top:.3rem;color:var(--er)}.msg.h{color:var(--mu)}
+.str{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:.5rem}.str i{height:4px;border-radius:2px;background:var(--ln);transition:background .2s}
+.chk{display:flex;gap:.6rem;align-items:flex-start;font-size:.9rem;color:var(--mu);margin:.2rem 0 1rem}.chk input{margin-top:.25rem;accent-color:var(--ac)}
+.chk a{color:var(--ac);background:none;border:0;padding:0;text-decoration:underline}
+.al{border:1px solid #6b2f3a;background:#2a1219;color:#ffb3b3;border-radius:10px;padding:.65rem .85rem;margin-bottom:1rem;font-size:.92rem}
+/* shell */
+.shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
+.nav{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:1.5rem;padding:1.3rem 1rem;background:var(--sf);border-right:1px solid var(--ln)}
+.nav nav{display:grid;gap:.25rem}
+.nav nav button{display:flex;gap:.7rem;align-items:center;border:0;background:transparent;border-radius:10px;padding:.65rem .8rem;color:var(--mu);text-align:left;font-weight:500}
+.nav nav button:hover{background:var(--rs);color:var(--tx)}.nav nav button[aria-current=page]{background:var(--rs);color:var(--tx);box-shadow:inset 3px 0 0 var(--ac)}
+.me{margin-top:auto;display:flex;gap:.7rem;align-items:center;padding-top:1rem;border-top:1px solid var(--ln)}
+.me>div:nth-child(2){min-width:0;flex:1;line-height:1.25}.me b{display:block;overflow:hidden;text-overflow:ellipsis}.me small{color:var(--mu)}
+.av{width:36px;height:36px;border-radius:50%;background:var(--rs);border:1px solid var(--ln);display:grid;place-items:center;font-weight:700;color:var(--ac)}
+.mtop{display:none}
+.main{padding:2rem clamp(1rem,4vw,3rem) 4rem;max-width:1100px;width:100%}
+.ph{display:flex;justify-content:space-between;align-items:end;gap:1rem;flex-wrap:wrap;margin-bottom:1.6rem}
+.ph h1{font-size:clamp(1.7rem,3vw,2.3rem);letter-spacing:-.035em;font-weight:800;line-height:1.1}.ph p{color:var(--mu);margin-top:.25rem}
+.stats{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:.9rem;margin-bottom:.9rem}
+.card{background:var(--sf);border:1px solid var(--ln);border-radius:14px;padding:1.1rem 1.2rem}
+.stat span{color:var(--mu);font-size:.9rem}.stat b{display:block;font-size:2rem;font-weight:800;letter-spacing:-.03em;line-height:1.2;margin-top:.15rem}
+.stat:first-child b{font-size:2.8rem}.stat small{color:var(--mu)}
+.ch h3,.sec h3{font-size:1.05rem;font-weight:700}.ch .hd{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;color:var(--mu);font-size:.9rem}
+.plot{display:flex;gap:.6rem;align-items:end;height:190px;background:linear-gradient(var(--ln) 1px,transparent 1px) 0 0/100% 25%;padding-top:1px}
+.plot div{flex:1;display:flex;flex-direction:column;justify-content:end;align-items:center;gap:.25rem;height:100%;font-size:.78rem;color:var(--mu)}
+.plot i{display:block;width:100%;max-width:56px;background:#4a3669;border-radius:6px 6px 0 0;min-height:3px;transition:height .5s cubic-bezier(.2,.8,.2,1)}
+.plot div:last-child i{background:var(--ac)}.plot div:last-child{color:var(--tx)}
+.plot span:first-child{margin-bottom:auto;padding-top:.2rem;opacity:0}.plot div:hover span:first-child{opacity:1}.plot div:last-child span:first-child{opacity:1}
+.sec{margin-top:1.6rem}.sec>h3{margin-bottom:.8rem}
+.tbl{width:100%;border-collapse:collapse}.tbl th{text-align:left;font-weight:500;color:var(--mu);font-size:.85rem;padding:.4rem .6rem}.tbl td{padding:.7rem .6rem;border-top:1px solid var(--ln)}.tbl .r{text-align:right}
+.tbl tr[data-a]{cursor:pointer}.tbl tr[data-a]:hover td{background:var(--rs)}
+.bdg{display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;border-radius:999px;padding:.12rem .6rem;border:1px solid var(--ln);color:var(--mu)}.bdg::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ok)}.bdg.off::before{background:var(--wa)}
+.slots{display:flex;align-items:center;gap:.7rem;color:var(--mu);font-size:.9rem}.slots div{display:flex;gap:4px}.slots i{width:22px;height:6px;border-radius:3px;background:var(--ln)}.slots i.on{background:var(--ac)}
+.sc{margin-bottom:.9rem}.sc.pause{opacity:.7}
+.sh{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:center}
+.sh h3{font-size:1.25rem;font-weight:700;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap}
+.met{display:flex;gap:1.5rem;color:var(--mu);font-size:.9rem}.met b{color:var(--tx);font-size:1.1rem;font-weight:700;margin-right:.3rem}
+.ls{display:flex;gap:.5rem;margin:.9rem 0}
+.ls code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;background:var(--bg);border:1px solid var(--ln);border-radius:10px;padding:.6rem .85rem;font:13px var(--mono);color:var(--ok)}
+.acts{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}.acts .sp{flex:1}
+.sw{width:42px;height:24px;border-radius:999px;border:1px solid var(--ln);background:var(--rs);position:relative;padding:0;transition:background .2s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--mu);transition:transform .2s,background .2s}
+.sw[aria-checked=true]{background:#5b2a46;border-color:var(--ac)}.sw[aria-checked=true]::after{transform:translateX(18px);background:var(--ac)}
+.emp{border:1px dashed var(--ln);border-radius:14px;padding:3rem 1.5rem;text-align:center;color:var(--mu)}.emp h3{color:var(--tx);font-size:1.2rem;margin-bottom:.4rem}.emp .btn{margin-top:1.1rem}
+.steps{display:grid;gap:.9rem;counter-reset:s}.steps .card{display:grid;grid-template-columns:40px 1fr;gap:1rem;counter-increment:s}
+.steps .card::before{content:counter(s);width:36px;height:36px;border-radius:50%;background:var(--rs);border:1px solid var(--ln);display:grid;place-items:center;font-weight:700;color:var(--ac)}
+.steps h3{font-size:1.05rem}.steps p{color:var(--mu);margin-top:.2rem}
+pre.cd{margin:.8rem 0 0;background:var(--bg);border:1px solid var(--ln);border-radius:10px;padding:.8rem 1rem;font:13px var(--mono);color:var(--ok);overflow-x:auto}
+.prot{display:grid;grid-template-columns:repeat(2,1fr);gap:.8rem}.prot div{display:flex;gap:.7rem}.prot svg{color:var(--ok);flex:none;margin-top:.2rem}.prot b{display:block}.prot span{color:var(--mu);font-size:.92rem}
+.note{border-left:3px solid var(--wa);background:var(--sf);border-radius:0 10px 10px 0;padding:.8rem 1rem;color:var(--mu);font-size:.95rem}.note b{color:var(--tx)}
+dialog{background:var(--sf);color:var(--tx);border:1px solid var(--ln);border-radius:16px;width:min(640px,94vw);max-height:92vh;padding:1.5rem;overflow:auto}
+dialog::backdrop{background:#080410cc;backdrop-filter:blur(3px)}
+dialog h3{font-size:1.3rem;font-weight:800;margin-bottom:1rem;letter-spacing:-.02em}
+.edt label{display:block;font-size:.9rem;color:var(--mu);margin:.9rem 0 .35rem}
+.edt textarea{min-height:230px;font:13px/1.6 var(--mono);resize:vertical;tab-size:2;white-space:pre}
+.edt .dz{position:relative}.edt .dz.over textarea{border-color:var(--ac);background:var(--rs)}
+.edt .ft{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;color:var(--mu);font-size:.85rem;margin-top:.4rem}
+.url{font:12.5px var(--mono);color:var(--mu);margin-top:.35rem;word-break:break-all}.url b{color:var(--ok);font-weight:500}
+.meter{height:4px;border-radius:2px;background:var(--ln);margin-top:.4rem;overflow:hidden}.meter i{display:block;height:100%;background:var(--ok);width:0}
+.da{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1.3rem}
+.sk{border-radius:14px;background:linear-gradient(90deg,var(--sf),var(--rs),var(--sf));background-size:200% 100%;animation:sh 1.2s infinite;height:110px;margin-bottom:.9rem}
+@keyframes sh{to{background-position:-200% 0}}
+#toasts{position:fixed;right:1rem;bottom:1rem;display:grid;gap:.5rem;z-index:99;max-width:min(360px,92vw)}
+.ts{background:var(--rs);border:1px solid var(--ln);border-left:3px solid var(--ok);border-radius:10px;padding:.7rem 1rem;animation:in .25s both;box-shadow:0 8px 30px #0008}.ts.err{border-left-color:var(--er)}
+@media(max-width:900px){.auth{grid-template-columns:1fr}.brand{border-right:0;border-bottom:1px solid var(--ln)}.term #tl{min-height:0}
+ .stats{grid-template-columns:1fr 1fr}.stat:first-child{grid-column:1/-1}.prot{grid-template-columns:1fr}}
+@media(max-width:760px){.shell{grid-template-columns:1fr}.nav{position:fixed;inset:auto 0 0 0;height:auto;flex-direction:row;padding:.4rem;z-index:20;border-right:0;border-top:1px solid var(--ln)}
+ .nav .logo,.nav .me{display:none}.nav nav{grid-auto-flow:column;grid-auto-columns:1fr;width:100%}.nav nav button{flex-direction:column;gap:.1rem;font-size:.75rem;padding:.4rem;text-align:center}.nav nav button[aria-current=page]{box-shadow:none}
+ .mtop{display:flex;justify-content:space-between;align-items:center;padding:.9rem 1rem;border-bottom:1px solid var(--ln)}.main{padding-bottom:6rem}.brand .bf{display:none}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<dialog id="dlg"></dialog>
+<dialog id="cf"></dialog>
+<div id="toasts" role="status" aria-live="polite"></div>
+<script>
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (n) => Number(n || 0).toLocaleString('es');
+const IC = {
+  grid: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+  code: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>', book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/>',
+  out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>', plus: '<path d="M12 5v14M5 12h14"/>',
+  copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
+  chart: '<path d="M3 3v18h18M7 15l4-4 3 3 5-6"/>', edit: '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>', check: '<path d="m5 12 5 5 9-10"/>',
+  eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  eyeoff: '<path d="M3 3l18 18M10.6 5.1A9.7 9.7 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3 3.6M6.6 6.6A17 17 0 0 0 2 12s4 7 10 7a9.6 9.6 0 0 0 4.4-1"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="m9 12 2 2 4-4"/>',
+};
+const ic = (n, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]}</svg>`;
+const GOOGLE = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09a6.6 6.6 0 0 1 0-4.18V7.07H2.18a11 11 0 0 0 0 9.86z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/></svg>';
+const DISCORD = '<svg width="18" height="18" viewBox="0 0 24 24" fill="#5865F2" aria-hidden="true"><path d="M20.317 4.37a19.8 19.8 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .078-.01c3.928 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .079.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>';
+
+let me = null, mode = 'login', view = ['resumen', 'scripts', 'guia'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'resumen';
+let D = { ov: null, list: null }, prov = {};
+
+async function api(p, o = {}) {
+  const r = await fetch(p, { method: o.method || 'GET', headers: { 'Content-Type': 'application/json' }, body: o.body ? JSON.stringify(o.body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && me && !p.startsWith('/api/login')) { me = null; authView(); throw new Error('Tu sesión venció, volvé a entrar'); }
+  if (!r.ok) throw new Error(j.error || 'Algo salió mal, probá de nuevo');
+  return j;
+}
+function toast(m, t = '') { const e = document.createElement('div'); e.className = 'ts ' + t; e.textContent = m; $('#toasts').append(e); setTimeout(() => e.remove(), 3200); }
+function ask(title, msg, btn) {
+  return new Promise((res) => {
+    const d = $('#cf'); d.innerHTML = `<h3>${esc(title)}</h3><p style="color:var(--mu)">${esc(msg)}</p><div class="da"><button class="btn" id="cn">Cancelar</button><button class="btn pri" id="cy">${esc(btn)}</button></div>`;
+    d.onclose = () => res(d.returnValue === 'y'); $('#cn').onclick = () => d.close('n'); $('#cy').onclick = () => d.close('y'); d.showModal();
+  });
+}
+const logo = () => `<div class="logo"><i>${ic('shield', 20)}</i>Lexy Protect</div>`;
+
+/* ---------- Login / registro ---------- */
+const TERM = [['Chrome 124 (navegador)', 'bloqueado · navegador', 0], ['DiscordBot', 'bloqueado · bot', 0], ['curl/8.4', 'bloqueado · cliente HTTP', 0], ['Roblox/WinInet', 'entregado · cifrado', 1], ['mismo token otra vez', 'bloqueado · replay', 0]];
+async function authView() {
+  try { prov = await api('/api/providers'); } catch { prov = {}; }
+  const reg = mode === 'register', q = new URLSearchParams(location.search).get('error');
+  $('#app').innerHTML = `<div class="auth">
+  <aside class="brand"><div>${logo()}</div>
+    <div><h1>Tu código Lua, a salvo del .get</h1><p class="lead">Subí tu script, copiá el loadstring y ejecutalo con Delta. Navegadores, bots de Discord y spies se quedan afuera.</p></div>
+    <div class="term" aria-hidden="true"><div class="th">registro de accesos · /s/mi-script</div><div id="tl"></div></div>
+    <div class="bf"><span>Gratis</span><span>Hasta 5 scripts por cuenta</span><span>Estadísticas por semana</span></div></aside>
+  <section class="side"><div class="ca">
+    <div class="seg" role="tablist"><button role="tab" data-m="login" aria-selected="${!reg}">Iniciar sesión</button><button role="tab" data-m="register" aria-selected="${reg}">Crear cuenta</button></div>
+    <h2>${reg ? 'Creá tu cuenta' : 'Bienvenido de vuelta'}</h2><p class="sub">${reg ? 'Tardás menos de un minuto.' : 'Entrá para ver tus scripts y estadísticas.'}</p>
+    <div class="oa"><button class="btn" id="g" ${prov.google ? '' : 'disabled title="Google no está configurado"'}>${GOOGLE} Google</button><button class="btn" id="d" ${prov.discord ? '' : 'disabled title="Discord no está configurado"'}>${DISCORD} Discord</button></div>
+    <div class="or">o con tu usuario</div>
+    <div class="al" id="al" role="alert" ${q ? '' : 'hidden'}>${esc(q || '')}</div>
+    <form id="f" novalidate>
+      <div class="fld"><label for="u">${reg ? 'Usuario' : 'Usuario o correo'}</label><div class="inp" id="iu"><input id="u" autocomplete="username" autocapitalize="none" spellcheck="false" ${reg ? 'maxlength="20"' : ''}></div><div class="msg ${reg ? 'h' : ''}" id="mu">${reg ? '3-20 caracteres: letras, números o _' : ''}</div></div>
+      ${reg ? '<div class="fld"><label for="e">Correo <span>opcional</span></label><div class="inp" id="ie"><input id="e" type="email" autocomplete="email"></div><div class="msg" id="me"></div></div>' : ''}
+      <div class="fld"><label for="p">Contraseña</label><div class="inp" id="ip"><input id="p" type="password" autocomplete="${reg ? 'new-password' : 'current-password'}"><button type="button" class="eye" id="ey" aria-label="Mostrar contraseña">${ic('eye')}</button></div>
+        ${reg ? '<div class="str" id="st"><i></i><i></i><i></i><i></i></div>' : ''}<div class="msg ${reg ? 'h' : ''}" id="mp">${reg ? 'Mínimo 8 caracteres' : ''}</div></div>
+      ${reg ? '<label class="chk"><input type="checkbox" id="tc"><span>Acepto las <button type="button" id="rl">reglas de uso</button> de la plataforma.</span></label>' : ''}
+      <button class="btn pri w" id="go" type="submit">${reg ? 'Crear cuenta' : 'Entrar'}</button>
+    </form></div></section></div>`;
+  if (q) history.replaceState(0, '', '/');
+  $$('.seg button').forEach((b) => (b.onclick = () => { mode = b.dataset.m; authView(); }));
+  $('#g').onclick = () => (location.href = '/auth/google'); $('#d').onclick = () => (location.href = '/auth/discord');
+  $('#ey').onclick = () => { const i = $('#p'), s = i.type === 'password'; i.type = s ? 'text' : 'password'; $('#ey').innerHTML = ic(s ? 'eyeoff' : 'eye'); $('#ey').setAttribute('aria-label', s ? 'Ocultar contraseña' : 'Mostrar contraseña'); };
+  if (reg) {
+    $('#rl').onclick = rules;
+    $('#p').oninput = () => { const v = $('#p').value; const sc = Math.min(4, (v.length >= 8) + (v.length >= 12) + (/[a-z]/.test(v) && /[A-Z]/.test(v)) + (/\d/.test(v) && /[^\w]/.test(v)));
+      $$('#st i').forEach((e, i) => (e.style.background = i < sc ? ['#ff7a7a', '#ffc46b', '#c6e36f', '#6fe3c1'][sc - 1] : '')); $('#mp').textContent = v ? ['Muy débil', 'Débil', 'Aceptable', 'Buena', 'Excelente'][v.length < 8 ? 0 : sc] : 'Mínimo 8 caracteres'; };
+  }
+  const bad = (k, m) => { $('#i' + k).classList.add('bad'); const e = $('#m' + k); e.textContent = m; e.classList.remove('h'); };
+  $('#f').onsubmit = async (ev) => {
+    ev.preventDefault(); $$('.inp').forEach((e) => e.classList.remove('bad')); $$('.msg').forEach((e) => { if (!e.classList.contains('h')) e.textContent = ''; }); $('#al').hidden = true;
+    const u = $('#u').value.trim(), p = $('#p').value, e = reg ? $('#e').value.trim() : ''; let ok = true;
+    if (!u) { bad('u', 'Ingresá tu usuario' + (reg ? '' : ' o correo')); ok = false; } else if (reg && !/^[a-zA-Z0-9_]{3,20}$/.test(u)) { bad('u', 'Usá 3-20 letras, números o _'); ok = false; }
+    if (reg && e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { bad('e', 'Ese correo no parece válido'); ok = false; }
+    if (!p) { bad('p', 'Ingresá tu contraseña'); ok = false; } else if (reg && p.length < 8) { bad('p', 'Debe tener al menos 8 caracteres'); ok = false; }
+    if (reg && !$('#tc').checked) { toast('Aceptá las reglas de uso para continuar', 'err'); ok = false; }
+    if (!ok) return;
+    const b = $('#go'); b.disabled = true; b.classList.add('load');
+    try { await api(reg ? '/api/register' : '/api/login', { method: 'POST', body: reg ? { username: u, email: e || undefined, password: p } : { id: u, password: p } }); await boot(); }
+    catch (er) { $('#al').textContent = er.message; $('#al').hidden = false; b.disabled = false; b.classList.remove('load'); }
+  };
+  const tl = $('#tl'), still = matchMedia('(prefers-reduced-motion:reduce)').matches;
+  TERM.forEach((t, i) => setTimeout(() => { if (!$('#tl')) return; tl.insertAdjacentHTML('beforeend', `<div class="ln"><span class="m">GET</span><span class="u">${esc(t[0])}</span><span class="${t[2] ? 'ok' : 'no'}">${t[2] ? 200 : 403} ${esc(t[1])}</span></div>`); }, still ? 0 : 500 + i * 650));
+}
+function rules() {
+  const d = $('#dlg');
+  d.innerHTML = `<h3>Reglas de uso</h3><div style="color:var(--mu);display:grid;gap:.6rem"><p>Lexy Protect es para proteger tu propio código. Al usarla aceptás que:</p>
+  <p>• No vas a hostear malware, stealers, loggers de cuentas ni nada que robe datos de otras personas.</p><p>• Solo subís código tuyo o que tenés permiso de distribuir.</p>
+  <p>• No vas a intentar saltarte los límites ni atacar la plataforma.</p><p>• Podemos pausar o borrar scripts y cuentas que incumplan estas reglas.</p></div><div class="da"><button class="btn pri" id="x">Entendido</button></div>`;
+  d.showModal(); $('#x').onclick = () => d.close();
+}
+
+/* ---------- Panel ---------- */
+const NAV = [['resumen', 'grid', 'Resumen'], ['scripts', 'code', 'Mis scripts'], ['guia', 'book', 'Cómo usar']];
+function shell(inner) {
+  $('#app').innerHTML = `<div class="shell"><aside class="nav">${logo()}<nav aria-label="Principal">${NAV.map((n) => `<button data-a="nav" data-v="${n[0]}" ${view === n[0] ? 'aria-current="page"' : ''}>${ic(n[1])}<span>${n[2]}</span></button>`).join('')}</nav>
+    <div class="me"><div class="av">${esc(me.username[0].toUpperCase())}</div><div><b>${esc(me.username)}</b><small>${me.max} scripts máx.</small></div><button class="btn ghost sm" data-a="out" aria-label="Salir" title="Salir">${ic('out')}</button></div></aside>
+    <div><div class="mtop">${logo()}<button class="btn ghost sm" data-a="out" aria-label="Salir">${ic('out')}</button></div><main class="main">${inner}</main></div></div>`;
+}
+const WEEK = 6048e5;
+const wl = (st) => st.weeks.map((_, i) => (i === 7 ? 'Esta sem.' : new Date(st.start + i * WEEK).toLocaleDateString('es', { day: 'numeric', month: 'short', timeZone: 'UTC' })));
+const plot = (st) => { const m = Math.max(1, ...st.weeks), l = wl(st); return `<div class="plot" role="img" aria-label="Ejecuciones por semana: ${st.weeks.join(', ')}">${st.weeks.map((v, i) => `<div title="${fmt(v)} ejecuciones"><span>${fmt(v)}</span><i style="height:${Math.max(3, Math.round((v / m) * 140))}px"></i><span>${l[i]}</span></div>`).join('')}</div>`; };
+const ago = (t) => { if (!t) return 'Sin ejecuciones'; const m = Math.floor((Date.now() - t) / 6e4); return m < 1 ? 'Hace instantes' : m < 60 ? `Hace ${m} min` : m < 1440 ? `Hace ${Math.floor(m / 60)} h` : `Hace ${Math.floor(m / 1440)} d`; };
+const badge = (s) => `<span class="bdg ${s.enabled ? '' : 'off'}">${s.enabled ? 'Activo' : 'Pausado'}</span>`;
+const hasData = () => D.ov && D.list;
+
+function vResumen() {
+  const o = D.ov, l = D.list;
+  return `<div class="ph"><div><h1>Hola, ${esc(me.username)}</h1><p>Así van tus scripts.</p></div><button class="btn pri" data-a="new" ${l.length >= me.max ? 'disabled' : ''}>${ic('plus')} Subir script</button></div>
+  <div class="stats"><div class="card stat"><span>Ejecuciones totales</span><b>${fmt(o.total)}</b></div><div class="card stat"><span>Hoy</span><b>${fmt(o.today)}</b></div>
+   <div class="card stat"><span>Esta semana</span><b>${fmt(o.week)}</b><small>Semana pasada: ${fmt(o.weeks[6])}</small></div><div class="card stat"><span>Accesos bloqueados</span><b>${fmt(o.blocked)}</b></div></div>
+  <div class="card ch"><div class="hd"><h3 style="color:var(--tx)">Ejecuciones por semana</h3><span>Últimas 8 semanas</span></div>${plot(o)}</div>
+  <div class="sec"><h3>Tus scripts</h3>${l.length ? `<div class="card" style="padding:.4rem .6rem;overflow-x:auto"><table class="tbl"><thead><tr><th>Nombre</th><th>Estado</th><th class="r">Ejecuciones</th><th class="r">Última</th></tr></thead><tbody>${l.map((s) => `<tr data-a="nav" data-v="scripts"><td><b>${esc(s.slug)}</b></td><td>${badge(s)}</td><td class="r">${fmt(s.total)}</td><td class="r" style="color:var(--mu)">${ago(s.last)}</td></tr>`).join('')}</tbody></table></div>`
+    : `<div class="emp"><h3>Todavía no tenés scripts</h3><p>Subí el primero y recibís tu loadstring al instante.</p><button class="btn pri" data-a="new">${ic('plus')} Subir mi primer script</button></div>`}</div>`;
+}
+function vScripts() {
+  const l = D.list;
+  return `<div class="ph"><div><h1>Mis scripts</h1><p class="slots"><span>${l.length} de ${me.max}</span><span class="slots"><span style="display:flex;gap:4px">${Array.from({ length: me.max }, (_, i) => `<i class="${i < l.length ? 'on' : ''}"></i>`).join('')}</span></span></p></div>
+  <button class="btn pri" data-a="new" ${l.length >= me.max ? 'disabled title="Llegaste al límite"' : ''}>${ic('plus')} Subir script</button></div>
+  ${l.length ? l.map((s) => `<article class="card sc ${s.enabled ? '' : 'pause'}"><div class="sh"><h3>${esc(s.slug)} ${badge(s)}</h3><div class="met"><span><b>${fmt(s.total)}</b>ejecuciones</span><span>${ago(s.last)}</span><span><b>${fmt(s.blocked)}</b>bloqueados</span></div></div>
+    <div class="ls"><code>${esc(s.loadstring)}</code><button class="btn" data-a="copy" data-id="${s.id}">${ic('copy', 16)} Copiar</button></div>
+    <div class="acts"><button class="btn sm" data-a="stats" data-id="${s.id}">${ic('chart', 16)} Estadísticas</button><button class="btn sm" data-a="edit" data-id="${s.id}">${ic('edit', 16)} Editar</button><a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noopener">${ic('eye', 16)} Ver página</a><span class="sp"></span>
+      <button class="sw" role="switch" aria-checked="${!!s.enabled}" aria-label="${s.enabled ? 'Pausar' : 'Activar'} ${esc(s.slug)}" data-a="tog" data-id="${s.id}"></button><button class="btn sm dng ghost" data-a="del" data-id="${s.id}" aria-label="Borrar ${esc(s.slug)}">${ic('trash', 16)}</button></div></article>`).join('')
+  : `<div class="emp"><h3>Acá van a aparecer tus scripts</h3><p>Pegá tu código, ponele un nombre y copiá el loadstring.</p><button class="btn pri" data-a="new">${ic('plus')} Subir mi primer script</button></div>`}`;
+}
+function vGuia() {
+  const ex = `loadstring(game:HttpGet("${location.origin}/s/mi-script"))()`;
+  return `<div class="ph"><div><h1>Cómo usar Lexy Protect</h1><p>De código a loadstring en tres pasos.</p></div></div>
+  <div class="steps"><div class="card"><div><h3>Subí tu script</h3><p>En “Mis scripts” tocá “Subir script”, pegá tu código o cargá el archivo .lua y elegí un nombre para el link.</p></div></div>
+   <div class="card"><div><h3>Copiá tu loadstring</h3><p>Cada script tiene el suyo, con el botón Copiar. Se ve así:</p><pre class="cd">${esc(ex)}</pre></div></div>
+   <div class="card"><div><h3>Ejecutalo con Delta</h3><p>Pegalo en tu executor y listo. Si alguien abre el link en un navegador solo ve la página de tu script con el loadstring; el código nunca se muestra. Con Discord u otras herramientas no entrega nada.</p></div></div></div>
+  <div class="sec"><h3>Qué protege</h3><div class="prot">
+   <div>${ic('shield')}<p><b>Anti .get y navegador</b><span>El navegador solo ve la página con el loadstring. Bots de Discord y clientes HTTP reciben un bloqueo.</span></p></div>
+   <div>${ic('shield')}<p><b>Anti spy</b><span>Detecta HttpSpy, SimpleSpy y herramientas parecidas antes de entregar el código.</span></p></div>
+   <div>${ic('shield')}<p><b>Abierto para todos</b><span>Cualquiera puede ejecutar tu script desde su executor: sin claves, tokens ni registro.</span></p></div>
+   <div>${ic('shield')}<p><b>Código cifrado</b><span>Viaja cifrado con una clave distinta en cada ejecución.</span></p></div>
+   <div>${ic('shield')}<p><b>Bloqueo de intrusos</b><span>Los bots que insisten quedan bloqueados 15 minutos. Los executors nunca se bloquean.</span></p></div>
+   <div>${ic('shield')}<p><b>Marca de agua</b><span>Cada ejecución lleva una marca oculta para rastrear filtraciones.</span></p></div></div></div>
+  <div class="sec"><p class="note"><b>Ojo:</b> ninguna protección es total. Para correr, el código tiene que quedar en claro dentro del executor, así que alguien con un executor que hookee <code>loadstring</code> todavía podría volcarlo. Si tu script vale mucho, ofuscalo antes de subirlo.</p></div>`;
+}
+const VIEWS = { resumen: vResumen, scripts: vScripts, guia: vGuia };
+function paint() {
+  const need = view !== 'guia' && !hasData();
+  shell(need ? '<div class="sk" style="height:60px;width:50%"></div><div class="sk"></div><div class="sk" style="height:220px"></div>' : VIEWS[view]());
+}
+async function load() { [D.ov, D.list] = await Promise.all([api('/api/overview'), api('/api/scripts')]); }
+async function dash() { paint(); if (view !== 'guia' || !hasData()) { await load(); paint(); } }
+setInterval(async () => { if (me && view !== 'guia' && !$('#dlg').open && !$('#cf').open) { try { await load(); paint(); } catch {} } }, 20000);
+
+/* ---------- Editor y estadísticas ---------- */
+const MAXB = 500000;
+async function editor(s) {
+  const d = $('#dlg');
+  d.innerHTML = `<div class="edt"><h3>${s ? 'Editar ' + esc(s.slug) : 'Subir script'}</h3>
+  ${s ? '' : `<label for="n">Nombre del link</label><input id="n" placeholder="mi-script" maxlength="24" autocomplete="off" spellcheck="false"><div class="url">${esc(location.origin)}/s/<b id="pv">mi-script</b></div><div class="msg" id="mn"></div>`}
+  <label for="c">Código Lua</label><div class="dz" id="dz"><textarea id="c" spellcheck="false" placeholder="-- pegá tu script o arrastrá un archivo .lua acá"></textarea></div>
+  <div class="ft"><span id="ln">0 líneas</span><span id="sz">0 KB / 500 KB</span></div><div class="meter"><i id="mt"></i></div>
+  <label for="f" style="display:flex;gap:.5rem;align-items:center">o cargá un archivo</label><input id="f" type="file" accept=".lua,.txt,text/plain">
+  <div class="msg" id="e2" role="alert"></div><div class="da"><button class="btn" id="x">Cancelar</button><button class="btn pri" id="ok">${s ? 'Guardar cambios' : 'Crear loadstring'}</button></div></div>`;
+  d.showModal();
+  const c = $('#c'), upd = () => { const b = new Blob([c.value]).size; $('#ln').textContent = `${fmt(c.value ? c.value.split('\n').length : 0)} líneas`; $('#sz').textContent = `${(b / 1024).toFixed(1)} KB / 500 KB`; $('#mt').style.width = Math.min(100, (b / MAXB) * 100) + '%'; $('#mt').style.background = b > MAXB ? 'var(--er)' : ''; };
+  c.oninput = upd;
+  c.onkeydown = (e) => { if (e.key === 'Tab') { e.preventDefault(); const a = c.selectionStart; c.setRangeText('  ', a, c.selectionEnd, 'end'); upd(); } if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('#ok').click(); };
+  const read = (f) => { if (!f) return; if (f.size > MAXB) return (($('#e2').textContent = 'El archivo pesa más de 500 KB')); const r = new FileReader(); r.onload = () => { c.value = r.result; upd(); }; r.readAsText(f); };
+  $('#f').onchange = (e) => read(e.target.files[0]);
+  const dz = $('#dz'); ['dragenter', 'dragover'].forEach((t) => dz.addEventListener(t, (e) => { e.preventDefault(); dz.classList.add('over'); })); ['dragleave', 'drop'].forEach((t) => dz.addEventListener(t, (e) => { e.preventDefault(); dz.classList.remove('over'); if (t === 'drop') read(e.dataTransfer.files[0]); }));
+  if (!s) { const n = $('#n'); n.oninput = () => { n.value = n.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''); $('#pv').textContent = n.value || 'mi-script'; $('#mn').textContent = n.value && n.value.length < 3 ? 'Mínimo 3 caracteres' : ''; }; n.focus(); }
+  else { c.value = (await api(`/api/scripts/${s.id}/content`)).content; upd(); }
+  $('#x').onclick = () => d.close();
+  $('#ok').onclick = async () => {
+    const b = $('#ok'); b.disabled = true; b.classList.add('load'); $('#e2').textContent = '';
+    try {
+      if (s) await api('/api/scripts/' + s.id, { method: 'PATCH', body: { content: c.value } }); else await api('/api/scripts', { method: 'POST', body: { name: $('#n').value, content: c.value } });
+      d.close(); toast(s ? 'Cambios guardados' : 'Script creado'); view = 'scripts'; await load(); paint();
+    } catch (e) { $('#e2').textContent = e.message; b.disabled = false; b.classList.remove('load'); }
+  };
+}
+async function stats(s) {
+  const st = await api(`/api/scripts/${s.id}/stats`), d = $('#dlg');
+  d.innerHTML = `<h3>${esc(s.slug)}</h3><div class="stats" style="grid-template-columns:repeat(4,1fr);gap:.6rem"><div class="card stat" style="grid-column:span 2"><span>Ejecuciones totales</span><b style="font-size:2.4rem">${fmt(st.total)}</b></div><div class="card stat"><span>Hoy</span><b>${fmt(st.today)}</b></div><div class="card stat"><span>Esta semana</span><b>${fmt(st.week)}</b></div></div>
+  <p style="color:var(--mu);margin:1rem 0 .5rem">Por semana · ${fmt(st.blocked)} accesos bloqueados en total</p>${plot(st)}<div class="da"><button class="btn" id="x">Cerrar</button></div>`;
+  d.showModal(); $('#x').onclick = () => d.close();
+}
+
+/* ---------- Acciones ---------- */
+const A = {
+  nav(_, b) { view = b.dataset.v; history.replaceState(0, '', '#' + view); dash(); },
+  new() { editor(); },
+  out: async () => { await api('/api/logout', { method: 'POST' }); me = null; D = { ov: null, list: null }; mode = 'login'; authView(); },
+  copy: (s) => { navigator.clipboard.writeText(s.loadstring).then(() => toast('Loadstring copiado'), () => toast('No pude copiar, seleccionalo a mano', 'err')); },
+  stats, edit: editor,
+  tog: async (s) => { await api('/api/scripts/' + s.id, { method: 'PATCH', body: { enabled: !s.enabled } }); await load(); paint(); toast(s.enabled ? 'Script pausado' : 'Script activado'); },
+  del: async (s) => { if (await ask(`¿Borrar “${s.slug}”?`, 'Se elimina el script y todas sus estadísticas. No se puede deshacer.', 'Borrar')) { await api('/api/scripts/' + s.id, { method: 'DELETE' }); await load(); paint(); toast('Script borrado'); } },
+};
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-a]'); if (!b || !A[b.dataset.a]) return;
+  const s = D.list?.find((x) => x.id == b.dataset.id);
+  try { await A[b.dataset.a](s, b); } catch (er) { toast(er.message, 'err'); }
+});
+document.addEventListener('click', (e) => { if (e.target.tagName === 'DIALOG' && e.target.id === 'dlg') e.target.close(); });
+
+async function boot() { try { me = await api('/api/me'); dash(); } catch { me = null; authView(); } }
+boot();
+</script>
+</body>
+</html>
