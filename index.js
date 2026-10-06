@@ -43,7 +43,9 @@ const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 const BASE_ENV = process.env.BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '');
-app.use((req, res, next) => { req.cip = req.headers['x-real-ip'] || req.ip; req.base = (BASE_ENV || `${req.protocol}://${req.get('host')}`).replace(/\/$/, ''); next(); });
+app.use((req, res, next) => { req.cip = req.headers['x-real-ip'] || req.ip; const proto = String(req.headers['x-forwarded-proto'] || req.protocol).split(',')[0].trim(), host = String(req.headers['x-forwarded-host'] || req.get('host') || '').split(',')[0].trim();
+  req.https = proto === 'https'; req.base = (host ? `${proto}://${host}` : BASE_ENV || BASE).replace(/\/$/, ''); next(); });
+app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 app.use(helmet({
   contentSecurityPolicy: { directives: {
     defaultSrc: ["'self'"], scriptSrc: ["'self'", "'unsafe-inline'"],
@@ -64,10 +66,11 @@ const lim = (windowMs, max) => rateLimit({ windowMs, max, standardHeaders: true,
 const apiLim = lim(60e3, 120), authLim = lim(10 * 60e3, 40), loadLim = lim(60e3, 120);
 
 /* ---------- Sesión ---------- */
-const setSess = (req, res, u) => res.cookie('lx', jwt.sign({ id: u.id }, SECRET, { expiresIn: '30d' }), { httpOnly: true, sameSite: 'lax', secure: req.secure, path: '/', maxAge: 30 * 864e5 });
+const setSess = (req, res, u) => { const t = jwt.sign({ id: Number(u.id) }, SECRET, { expiresIn: '30d' }); res.cookie('lx', t, { httpOnly: true, sameSite: 'lax', secure: !!req.https, path: '/', maxAge: 30 * 864e5 }); return t; };
+const tokenOf = (req) => req.cookies.lx || (/^Bearer (.+)$/.exec(req.headers.authorization || '') || [])[1];
 const auth = (req, res, next) => {
   try {
-    const p = jwt.verify(req.cookies.lx, SECRET);
+    const p = jwt.verify(tokenOf(req), SECRET);
     const u = db.prepare('select id, username, email from users where id=?').get(p.id);
     if (!u) throw 0;
     if (p.iat && Date.now() / 1000 - p.iat > 86400) setSess(req, res, u); // renueva: la sesión se mantiene mientras uses la web
@@ -83,13 +86,13 @@ app.post('/api/register', lim(60 * 60e3, 15), authLim, (req, res) => {
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Correo inválido' });
   if (db.prepare('select 1 from users where username=? or (email is not null and email=?)').get(username, email || null)) return res.status(409).json({ error: 'Usuario o correo ya registrado' });
   const r = db.prepare('insert into users(username,email,pass,created) values(?,?,?,?)').run(username, email || null, bcrypt.hashSync(password, 11), Date.now());
-  setSess(req, res, { id: r.lastInsertRowid }); res.json({ ok: 1 });
+  res.json({ ok: 1, token: setSess(req, res, { id: r.lastInsertRowid }) });
 });
 app.post('/api/login', authLim, (req, res) => {
   const id = String(req.body?.id || ''), pw = String(req.body?.password || '');
   const u = db.prepare('select * from users where (username=? or email=?) and pass is not null').get(id, id);
   if (!u || !bcrypt.compareSync(pw, u.pass)) return res.status(401).json({ error: 'Datos incorrectos' });
-  setSess(req, res, u); res.json({ ok: 1 });
+  res.json({ ok: 1, token: setSess(req, res, u) });
 });
 app.post('/api/logout', (req, res) => { res.clearCookie('lx', { path: '/' }); res.json({ ok: 1 }); });
 app.get('/api/me', auth, (req, res) => res.json({ ...req.user, max: MAX_SCRIPTS }));
@@ -103,8 +106,8 @@ app.get('/api/providers', (req, res) => res.json({ google: !!OA.google.id, disco
 app.get('/auth/:p', authLim, (req, res) => {
   const o = OA[req.params.p];
   if (!o || !o.id) return res.redirect('/?error=' + encodeURIComponent('Ese método no está configurado'));
-  const st = crypto.randomBytes(16).toString('hex');
-  res.cookie('lx_st', st, { httpOnly: true, sameSite: 'lax', secure: req.secure, path: '/', maxAge: 6e5 });
+  const n = crypto.randomBytes(16).toString('hex'), st = jwt.sign({ n, p: req.params.p }, SECRET, { expiresIn: '15m' });
+  res.cookie('lx_st', n, { httpOnly: true, sameSite: 'lax', secure: !!req.https, path: '/', maxAge: 9e5 });
   res.redirect(o.auth + '?' + new URLSearchParams({ client_id: o.id, redirect_uri: `${req.base}/auth/${req.params.p}/callback`, response_type: 'code', scope: o.scope, state: st }));
 });
 const UA = { 'User-Agent': 'DiscordBot (https://lexyprotect, 1.0)', Accept: 'application/json' };
@@ -112,7 +115,8 @@ app.get('/auth/:p/callback', authLim, async (req, res) => {
   const o = OA[req.params.p], fail = (m) => res.redirect('/?error=' + encodeURIComponent(m));
   try {
     if (req.query.error) return fail('Cancelaste el inicio de sesión');
-    if (!o || !req.query.code || !req.cookies.lx_st || req.query.state !== req.cookies.lx_st) return fail('Sesión de login inválida, probá de nuevo');
+    let stp; try { stp = jwt.verify(String(req.query.state || ''), SECRET); } catch {}
+    if (!o || !req.query.code || !stp || stp.p !== req.params.p || (req.cookies.lx_st && req.cookies.lx_st !== stp.n)) return fail('Sesión de login inválida, probá de nuevo');
     res.clearCookie('lx_st', { path: '/' });
     const tr = await fetch(o.token, { method: 'POST', headers: { ...UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: o.id, client_secret: o.secret, grant_type: 'authorization_code', code: req.query.code, redirect_uri: `${req.base}/auth/${req.params.p}/callback` }) });
     const t = await tr.json().catch(() => ({}));
@@ -130,7 +134,7 @@ app.get('/auth/:p/callback', authLim, async (req, res) => {
       const r = db.prepare('insert into users(username,email,provider,pid,created) values(?,?,?,?,?)').run(name, email, req.params.p, String(prof.pid), Date.now());
       u = { id: r.lastInsertRowid };
     }
-    setSess(req, res, u); res.redirect('/');
+    res.redirect('/#t=' + setSess(req, res, u));
   } catch (e) { console.error('[oauth]', e); fail('Error al iniciar sesión'); }
 });
 
