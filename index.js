@@ -46,6 +46,8 @@ create index if not exists ix_sk on skeys(script_id);`);
 // migra las keys del modelo anterior (1 key por script) a la tabla nueva
 for (const r of db.prepare('select id, skey, key_ip, key_uid, key_at, lax from scripts where private=1 and skey is not null and not exists (select 1 from skeys where script_id=scripts.id)').all())
   db.prepare('insert or ignore into skeys(script_id,k,label,key_ip,key_uid,key_at,lax,created) values(?,?,?,?,?,?,?,?)').run(r.id, r.skey, 'Key 1', r.key_ip, r.key_uid, r.key_at, r.lax || 0, Date.now());
+// limpia restos de scripts ya borrados (keys, bans, ejecuciones huérfanas)
+db.exec('delete from skeys where script_id not in (select id from scripts); delete from bans where script_id not in (select id from scripts); delete from execs where script_id not in (select id from scripts);');
 const SECRET = process.env.JWT_SECRET || db.prepare("select v from meta where k='jwt'").get()?.v || (() => { const v = crypto.randomBytes(32).toString('hex'); db.prepare("insert into meta(k,v) values('jwt',?)").run(v); return v; })();
 
 const app = express();
@@ -162,7 +164,7 @@ app.get('/api/scripts', apiLim, auth, (req, res) => {
     (select count(*) from execs where script_id=s.id) total
     from scripts s where user_id=? order by id desc`).all(req.user.id);
   const ks = {}; db.prepare('select id, script_id, k, label, (key_ip is not null) bound, key_at, lax, enabled, uses, last from skeys where script_id in (select id from scripts where user_id=?) order by id').all(req.user.id).forEach((k) => (ks[k.script_id] ||= []).push(k));
-  res.json(rows.map((r) => ({ ...r, keys: ks[r.id] || [], url: urlFor(r.slug, req.base), loadstring: (r.private ? `script_key="${ks[r.id]?.[0]?.k || 'TU_KEY'}"; ` : '') + `loadstring(game:HttpGet("${urlFor(r.slug, req.base)}"))()` })));
+  res.json(rows.map((r) => ({ ...r, keys: ks[r.id] || [], url: urlFor(r.slug, req.base), loadstring: (r.private ? `script_key="${ks[r.id]?.[0]?.k || 'YOUR_KEY'}"; ` : '') + `loadstring(game:HttpGet("${urlFor(r.slug, req.base)}"))()` })));
 });
 app.post('/api/scripts', apiLim, auth, (req, res) => {
   const slug = String(req.body?.name || '').toLowerCase(), content = req.body?.content;
@@ -190,6 +192,8 @@ app.get('/api/scripts/:id/content', apiLim, auth, (req, res) => { const s = own(
 app.delete('/api/scripts/:id', apiLim, auth, (req, res) => {
   const s = own(req); if (!s) return res.status(404).json({ error: 'No existe' });
   db.prepare('delete from execs where script_id=?').run(s.id);
+  db.prepare('delete from skeys where script_id=?').run(s.id);
+  db.prepare('delete from bans where script_id=?').run(s.id);
   db.prepare('delete from scripts where id=?').run(s.id);
   res.json({ ok: 1 });
 });
@@ -281,18 +285,18 @@ pcall(function() for _, @v@ in ipairs({ game:GetService("CoreGui"), (gethui and 
 pcall(function() if game.HttpGet ~= game.HttpGet then @sc@ = @sc@ + 1 end end)
 pcall(function() if type(loadstring) ~= "function" or type(game.HttpGet) ~= "function" then @sc@ = @sc@ + 1 end end)
 ${STRICT ? `pcall(function() if islclosure and (islclosure(loadstring) or islclosure(game.HttpGet)) then @sc@ = @sc@ + 3 end end)` : ''}
-if @sc@ >= 3 then warn("[Lexy Protect] entorno no confiable") end
+if @sc@ >= 3 then warn("[Lexy Protect] untrusted environment") end
 local @k@, @u@, @r@ = "${k}", "${url}", nil
 local @ky@ = (tostring((getgenv and getgenv().script_key) or _G.script_key or ""):gsub("[^%w_%-]", ""))
 local @t@ = @u@ .. "?u=" .. tostring(@P@.UserId) .. "&k=" .. @ky@ .. "&s=" .. @sc@
 pcall(function() @r@ = game:HttpGet(@t@) end)
 if type(@r@) ~= "string" then pcall(function() local @q@ = request or http_request or (syn and syn.request); if @q@ then @r@ = @q@({ Url = @t@, Method = "GET" }).Body end end) end
 if type(@r@) == "string" and @r@:sub(1, 2) == "ER" then return warn("[Lexy Protect] " .. @r@:sub(3)) end
-if type(@r@) ~= "string" or #@r@ < 11 or @r@:sub(1, 2) ~= "LX" then return warn("[Lexy Protect] no se pudo cargar el script") end
+if type(@r@) ~= "string" or #@r@ < 11 or @r@:sub(1, 2) ~= "LX" then return warn("[Lexy Protect] could not load the script") end
 local @s@ = @r@:sub(11)
 local @h@ = 5381
 for @i@ = 1, #@s@ do @h@ = (@h@ * 33 + @s@:byte(@i@)) % 4294967296 end
-if string.format("%08x", @h@) ~= @r@:sub(3, 10) then return warn("[Lexy Protect] integridad inválida (anti-tamper)") end
+if string.format("%08x", @h@) ~= @r@:sub(3, 10) then return warn("[Lexy Protect] integrity check failed (anti-tamper)") end
 local @C@ = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local @T@ = {} for @i@ = 1, 64 do @T@[@C@:byte(@i@)] = @i@ - 1 end
 local function @dec@(z)
@@ -346,12 +350,25 @@ const wm = (id) => '--' + Number(id).toString(2).replace(/0/g, '\u200b').replace
 
 const he = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Página pública de cada script (como Luarmor): muestra el loadstring, nunca el código
-function landing(res, slug, base) {
+const LT = {
+  en: { by: 'Published by', on: 'Active', off: 'Paused by its owner', copy: 'Copy loadstring', copied: 'Copied!', priv: 'Private script: replace YOUR_KEY with your key. ', paste: "Paste it in your executor (Delta) and run it. The script's code is protected and can't be viewed from here.", na: "This script isn't available right now.", runs: 'executions', prot: 'Protected by Lexy Protect', lc: 'Link copied!' },
+  es: { by: 'Publicado por', on: 'Activo', off: 'Pausado por su dueño', copy: 'Copiar loadstring', copied: '¡Copiado!', priv: 'Script privado: reemplazá YOUR_KEY por tu key. ', paste: 'Pegalo en tu executor (Delta) y ejecutalo. El código del script está protegido y no se puede ver desde acá.', na: 'Este script no está disponible por ahora.', runs: 'ejecuciones', prot: 'Protegido por Lexy Protect', lc: '¡Link copiado!' },
+  pt: { by: 'Publicado por', on: 'Ativo', off: 'Pausado pelo dono', copy: 'Copiar loadstring', copied: 'Copiado!', priv: 'Script privado: substitua YOUR_KEY pela sua key. ', paste: 'Cole no seu executor (Delta) e execute. O código do script está protegido e não pode ser visto aqui.', na: 'Este script não está disponível no momento.', runs: 'execuções', prot: 'Protegido por Lexy Protect', lc: 'Link copiado!' },
+  fr: { by: 'Publié par', on: 'Actif', off: 'En pause (par son propriétaire)', copy: 'Copier le loadstring', copied: 'Copié !', priv: 'Script privé : remplacez YOUR_KEY par votre clé. ', paste: "Collez-le dans votre executor (Delta) et exécutez-le. Le code du script est protégé et ne peut pas être vu ici.", na: "Ce script n'est pas disponible pour le moment.", runs: 'exécutions', prot: 'Protégé par Lexy Protect', lc: 'Lien copié !' },
+  de: { by: 'Veröffentlicht von', on: 'Aktiv', off: 'Vom Besitzer pausiert', copy: 'Loadstring kopieren', copied: 'Kopiert!', priv: 'Privates Skript: ersetze YOUR_KEY durch deinen Key. ', paste: 'Füge es in deinen Executor (Delta) ein und führe es aus. Der Code des Skripts ist geschützt und hier nicht einsehbar.', na: 'Dieses Skript ist derzeit nicht verfügbar.', runs: 'Ausführungen', prot: 'Geschützt von Lexy Protect', lc: 'Link kopiert!' },
+  it: { by: 'Pubblicato da', on: 'Attivo', off: 'In pausa (dal proprietario)', copy: 'Copia loadstring', copied: 'Copiato!', priv: 'Script privato: sostituisci YOUR_KEY con la tua key. ', paste: 'Incollalo nel tuo executor (Delta) ed eseguilo. Il codice dello script è protetto e non si può vedere da qui.', na: 'Questo script non è disponibile al momento.', runs: 'esecuzioni', prot: 'Protetto da Lexy Protect', lc: 'Link copiato!' },
+  ru: { by: 'Автор:', on: 'Активен', off: 'Приостановлен владельцем', copy: 'Копировать loadstring', copied: 'Скопировано!', priv: 'Приватный скрипт: замените YOUR_KEY на ваш ключ. ', paste: 'Вставьте в экзекьютор (Delta) и запустите. Код скрипта защищён и отсюда не виден.', na: 'Этот скрипт сейчас недоступен.', runs: 'запусков', prot: 'Защищено Lexy Protect', lc: 'Ссылка скопирована!' },
+  tr: { by: 'Yayınlayan:', on: 'Aktif', off: 'Sahibi tarafından duraklatıldı', copy: "Loadstring'i kopyala", copied: 'Kopyalandı!', priv: 'Özel script: YOUR_KEY yerine kendi key\'ini yaz. ', paste: "Executor'ına (Delta) yapıştır ve çalıştır. Scriptin kodu korumalıdır ve buradan görüntülenemez.", na: 'Bu script şu an kullanılamıyor.', runs: 'çalıştırma', prot: 'Lexy Protect ile korunuyor', lc: 'Bağlantı kopyalandı!' },
+  id: { by: 'Dipublikasikan oleh', on: 'Aktif', off: 'Dijeda oleh pemiliknya', copy: 'Salin loadstring', copied: 'Disalin!', priv: 'Skrip privat: ganti YOUR_KEY dengan key-mu. ', paste: 'Tempel di executor-mu (Delta) lalu jalankan. Kode skrip dilindungi dan tidak bisa dilihat dari sini.', na: 'Skrip ini sedang tidak tersedia.', runs: 'eksekusi', prot: 'Dilindungi oleh Lexy Protect', lc: 'Tautan disalin!' },
+};
+const LNAMES = { en: 'English', es: 'Español', pt: 'Português (Brasil)', fr: 'Français', de: 'Deutsch', it: 'Italiano', ru: 'Русский', tr: 'Türkçe', id: 'Bahasa Indonesia' };
+function landing(res, slug, base, lang0) {
+  const lang = LT[lang0] ? lang0 : 'en', L = LT[lang];
   slug = String(slug).toLowerCase();
   const r = db.prepare('select s.enabled, s.private, u.username owner, (select count(*) from execs where script_id=s.id) total from scripts s join users u on u.id=s.user_id where s.slug=?').get(slug);
   if (!r) return deny(res, 404);
-  const ls = (r.private ? 'script_key="TU_KEY"; ' : '') + `loadstring(game:HttpGet("${urlFor(slug, base)}"))()`;
-  res.status(200).type('html').set('Cache-Control', 'no-store').send(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${he(slug)} · Lexy Protect</title>
+  const ls = (r.private ? 'script_key="YOUR_KEY"; ' : '') + `loadstring(game:HttpGet("${urlFor(slug, base)}"))()`;
+  res.status(200).type('html').set('Cache-Control', 'no-store').send(`<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${he(slug)} · Lexy Protect</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet"><style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:1.2rem;background:#130d1b;color:#f0e9fa;font:16px/1.55 'Bricolage Grotesque',system-ui,sans-serif}
 .c{width:100%;max-width:560px;background:#1b1226;border:1px solid #34264a;border-radius:18px;padding:2rem}
@@ -362,22 +379,22 @@ button{width:100%;border:0;border-radius:10px;padding:.8rem;background:#ff6fae;c
 .m{display:flex;justify-content:space-between;gap:1rem;margin-top:1.4rem;color:#9a8cb3;font-size:.9rem;flex-wrap:wrap}
 .dl{display:flex;align-items:center;gap:.5rem;margin-top:1.2rem;color:#4da3ff;text-decoration:underline;word-break:break-all;font-size:.92rem}
 .o{display:inline-flex;gap:.4rem;align-items:center;font-size:.85rem;border:1px solid #34264a;border-radius:999px;padding:.1rem .65rem;color:#9a8cb3;margin-top:.8rem}.o::before{content:"";width:7px;height:7px;border-radius:50%;background:${r.enabled ? '#6fe3c1' : '#ffc46b'}}
-</style></head><body><main class="c"><div class="lg"><i><svg width="16" height="16" viewBox="0 0 24 24" fill="#130d1b"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></i>Lexy Protect</div>
-<h1>${he(slug)}</h1><p>Publicado por ${he(r.owner)}</p><span class="o">${r.enabled ? 'Activo' : 'Pausado por su dueño'}</span>
-${r.enabled ? `<code id="c">${he(ls)}</code><button id="b">Copiar loadstring</button><p style="margin-top:1rem;font-size:.9rem">${r.private ? 'Script privado: reemplazá TU_KEY por tu key. ' : ''}Pegalo en tu executor (Delta) y ejecutalo. El código del script está protegido y no se puede ver desde acá.</p>` : '<p style="margin-top:1.2rem">Este script no está disponible por ahora.</p>'}
-<div class="m"><span>${Number(r.total).toLocaleString('es')} ejecuciones</span><span>Protegido por Lexy Protect</span></div>${DC ? `<a class="dl" id="dl" href="${he(DC)}">${DSVG}<span>${he(DC.replace(/^https?:\/\//, ''))}</span></a>` : ''}</main>
-<script>var b=document.getElementById('b');if(b)b.onclick=function(){navigator.clipboard.writeText(document.getElementById('c').textContent).then(function(){b.textContent='¡Copiado!';setTimeout(function(){b.textContent='Copiar loadstring'},1500)})}var dl=document.getElementById('dl');if(dl)dl.onclick=function(e){e.preventDefault();var t=dl.getAttribute('href'),s=dl.querySelector('span'),o=s.textContent,ok=function(){s.textContent='¡Link copiado!';setTimeout(function(){s.textContent=o},1500)};(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(ok,function(){var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');ok()}catch(x){}a.remove()})};</script></body></html>`);
+</style></head><body><main class="c"><div style="display:flex;justify-content:flex-end;margin-bottom:1rem"><select id="lg" aria-label="Language" style="background:#130d1b;color:#f0e9fa;border:1px solid #34264a;border-radius:10px;padding:.35rem .6rem;font:inherit;font-size:.85rem">${Object.entries(LNAMES).map(([k, v]) => `<option value="${k}"${k === lang ? ' selected' : ''}>${v}</option>`).join('')}</select></div><div class="lg"><i><svg width="16" height="16" viewBox="0 0 24 24" fill="#130d1b"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></i>Lexy Protect</div>
+<h1>${he(slug)}</h1><p>${he(L.by)} ${he(r.owner)}</p><span class="o">${r.enabled ? he(L.on) : he(L.off)}</span>
+${r.enabled ? `<code id="c">${he(ls)}</code><button id="b">${he(L.copy)}</button><p style="margin-top:1rem;font-size:.9rem">${r.private ? he(L.priv) : ''}${he(L.paste)}</p>` : `<p style="margin-top:1.2rem">${he(L.na)}</p>`}
+<div class="m"><span>${Number(r.total).toLocaleString(lang === 'pt' ? 'pt-BR' : lang)} ${he(L.runs)}</span><span>${he(L.prot)}</span></div>${DC ? `<a class="dl" id="dl" href="${he(DC)}">${DSVG}<span>${he(DC.replace(/^https?:\/\//, ''))}</span></a>` : ''}</main>
+<script>var b=document.getElementById('b');if(b)b.onclick=function(){navigator.clipboard.writeText(document.getElementById('c').textContent).then(function(){b.textContent=${JSON.stringify(L.copied)};setTimeout(function(){b.textContent=${JSON.stringify(L.copy)}},1500)})};var lg=document.getElementById('lg');lg.onchange=function(){document.cookie='lxl='+lg.value+';path=/;max-age=31536000;samesite=lax';location.reload()};var dl=document.getElementById('dl');if(dl)dl.onclick=function(e){e.preventDefault();var t=dl.getAttribute('href'),s=dl.querySelector('span'),o=s.textContent,ok=function(){s.textContent=${JSON.stringify(L.lc)};setTimeout(function(){s.textContent=o},1500)};(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(ok,function(){var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');ok()}catch(x){}a.remove()})};</script></body></html>`);
 }
 
 const pend = new Map(); // token -> { sid, key, exp }  (un solo uso)
 setInterval(() => { const n = Date.now(); for (const [k, v] of pend) if (v.exp < n) pend.delete(k); }, 1e4).unref();
 function serve(req, res, slug) {
   if (isBanned(req.cip)) return deny(res);
-  if (isBrowser(req)) return landing(res, slug, req.base);
+  if (isBrowser(req)) return landing(res, slug, req.base, req.cookies.lxl);
   const s = db.prepare('select id, enabled, private from scripts where slug=?').get(String(slug).toLowerCase());
   if (!s) return deny(res, 404);
   if (BOT_UA.test(req.headers['user-agent'] || '')) { db.prepare('update scripts set blocked=blocked+1 where id=?').run(s.id); strike(req.cip); return deny(res); }
-  if (!s.enabled) return res.type('text/plain').set('Cache-Control', 'no-store').send('warn("[Lexy Protect] Este script está pausado por su dueño")');
+  if (!s.enabled) return res.type('text/plain').set('Cache-Control', 'no-store').send('warn("[Lexy Protect] This script is paused by its owner")');
   const r = s.private ? { lastInsertRowid: 0 } : db.prepare('insert into execs(script_id,ts,ip_hash,rbx_id,rbx_name,place) values(?,?,?,?,?,?)').run(s.id, Date.now(), hash(req.cip), '', '', ''); // los privados cuentan al validar la key
   const key = crypto.randomBytes(16), tok = crypto.randomBytes(18).toString('hex');
   pend.set(tok, { sid: s.id, eid: r.lastInsertRowid, key, exp: Date.now() + 30e3 });
@@ -393,16 +410,16 @@ app.get('/s/:slug/n/:tok', loadLim, (req, res) => {
   if (bad || !s || !s.enabled || s.slug !== String(req.params.slug).toLowerCase()) { strike(req.cip); if (p) db.prepare('update scripts set blocked=blocked+1 where id=?').run(p.sid); return deny(res); }
   const er = (m) => res.type('text/plain').set('Cache-Control', 'no-store').send('ER' + m);
   const uid = /^\d{1,12}$/.test(String(req.query.u || '')) ? String(req.query.u) : '';
-  if (uid && db.prepare('select 1 from bans where script_id=? and rbx_id=?').get(s.id, uid)) return er('Tu cuenta está bloqueada en este script');
+  if (uid && db.prepare('select 1 from bans where script_id=? and rbx_id=?').get(s.id, uid)) return er('Your account is blocked on this script');
   if (s.private) {
     const kk = String(req.query.k || ''), K = /^[A-Za-z0-9_-]{1,64}$/.test(kk) ? db.prepare('select * from skeys where script_id=? and k=?').get(s.id, kk) : null;
-    if (!K) { strike(req.cip); return er('Key inválida o faltante. Usá: script_key="TU_KEY"; loadstring(...)()'); }
-    if (!K.enabled) return er('Esta key está desactivada');
+    if (!K) { strike(req.cip); return er('Invalid or missing key. Use: script_key="YOUR_KEY"; loadstring(...)()'); }
+    if (!K.enabled) return er('This key is disabled');
     const ih = hash(ipn(req.cip));
     if (K.key_ip && K.key_ip !== ih && K.key_ip !== hash(req.cip)) {
       // modo "misma cuenta": si cambió la IP pero es el mismo UserId que la reclamó, la key lo sigue
       if (K.lax && uid && K.key_uid && uid === K.key_uid) db.prepare('update skeys set key_ip=? where id=?').run(ih, K.id);
-      else return er('Esta key ya fue reclamada por otra IP. Pedile al dueño que la reinicie.');
+      else return er('This key was already claimed by another IP. Ask the owner to reset it.');
     } else if (!K.key_ip) db.prepare('update skeys set key_ip=?, key_uid=?, key_at=? where id=?').run(ih, uid, Date.now(), K.id); // la reclama el primero que la usa
     db.prepare('update skeys set uses=uses+1, last=? where id=?').run(Date.now(), K.id);
   }
@@ -410,7 +427,7 @@ app.get('/s/:slug/n/:tok', loadLim, (req, res) => {
   if (uid) db.prepare('update execs set rbx_id=? where id=?').run(uid, p.eid); // anti-skid: queda registrado quién lo ejecutó
   const decoy = Number(req.query.s) >= 3; // entorno con spy/dumper: se entrega un señuelo
   if (decoy) db.prepare('update scripts set blocked=blocked+1 where id=?').run(s.id);
-  const src = decoy ? 'print("[Lexy Protect] entorno no confiable: el script no se ejecutó")' : s.content;
+  const src = decoy ? 'print("[Lexy Protect] untrusted environment: script not executed")' : s.content;
   const body = seal(`--[[lexy:${p.eid}]]\n${src}\n${wm(p.eid)}`, p.key);
   let ck = 5381; for (let i = 0; i < body.length; i++) ck = (ck * 33 + body.charCodeAt(i)) % 4294967296;
   res.type('text/plain').set('Cache-Control', 'no-store').send('LX' + ck.toString(16).padStart(8, '0') + body);
