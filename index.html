@@ -56,6 +56,9 @@ h1,h2,h3,p{margin:0}
 .str{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:.5rem}.str i{height:4px;border-radius:2px;background:var(--ln);transition:background .2s}
 .chk{display:flex;gap:.6rem;align-items:flex-start;font-size:.9rem;color:var(--mu);margin:.2rem 0 1rem}.chk input{margin-top:.25rem;accent-color:var(--ac)}
 .chk a{color:var(--ac);background:none;border:0;padding:0;text-decoration:underline}
+.dcl{color:#4da3ff;text-decoration:underline;word-break:break-all;cursor:pointer}.dcl:hover{color:#7bbcff}
+.dcc{display:flex;gap:.7rem;align-items:center;border:1px solid var(--ln);background:var(--rs);border-radius:12px;padding:.7rem .8rem}.dcc svg{flex:none;width:26px;height:26px}.dcc div{min-width:0;display:grid;line-height:1.3}.dcc small{color:var(--mu);font-size:.78rem}
+.kp{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin:0 0 .9rem;color:var(--mu);font-size:.9rem}.kp .sp{flex:1}.kc{font:13px var(--mono);color:var(--ok);background:var(--bg);border:1px solid var(--ln);border-radius:8px;padding:.2rem .5rem;user-select:all}
 .al{border:1px solid #6b2f3a;background:#2a1219;color:#ffb3b3;border-radius:10px;padding:.65rem .85rem;margin-bottom:1rem;font-size:.92rem}
 /* shell */
 .shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
@@ -151,7 +154,7 @@ const GOOGLE = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="tru
 const DISCORD = '<svg width="18" height="18" viewBox="0 0 24 24" fill="#5865F2" aria-hidden="true"><path d="M20.317 4.37a19.8 19.8 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .078-.01c3.928 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .079.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>';
 
 let me = null, mode = 'login', view = ['resumen', 'scripts', 'guia'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'resumen';
-let D = { ov: null, list: null }, prov = {};
+let D = { ov: null, list: null }, prov = {}, INV = '';
 
 async function api(p, o = {}) {
   const r = await fetch(p, { method: o.method || 'GET', headers: { 'Content-Type': 'application/json', ...(getT() ? { Authorization: 'Bearer ' + getT() } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined });
@@ -169,22 +172,25 @@ function ask(title, msg, btn, danger) {
     d.returnValue = 'n'; d.onclose = () => res(d.returnValue === 'y'); $('#cn').onclick = () => d.close('n'); $('#cy').onclick = () => d.close('y'); d.showModal();
   });
 }
+async function copyText(t) { try { await navigator.clipboard.writeText(t); return true; } catch { try { const a = document.createElement('textarea'); a.value = t; a.style.cssText = 'position:fixed;opacity:0'; document.body.append(a); a.select(); const ok = document.execCommand('copy'); a.remove(); return ok; } catch { return false; } } }
+const dcLink = () => INV ? `<a class="dcl" href="${esc(INV)}" data-a="dc" title="Tocá para copiar">${esc(INV.replace(/^https?:\/\//, ''))}</a>` : '';
+const dcCard = () => INV ? `<div class="dcc">${DISCORD}<div><b>Unite a nuestro Discord</b><small>Tocá el link para copiarlo</small>${dcLink()}</div></div>` : '';
 const logo = () => `<div class="logo"><i>${ic('shield', 20)}</i>Lexy Protect</div>`;
 
 /* ---------- Login / registro ---------- */
 const TERM = [['Chrome 124 (navegador)', 'bloqueado · navegador', 0], ['DiscordBot', 'bloqueado · bot', 0], ['curl/8.4', 'bloqueado · cliente HTTP', 0], ['Roblox/WinInet', 'entregado · cifrado', 1], ['mismo token otra vez', 'bloqueado · replay', 0]];
 async function authView() {
-  try { prov = await api('/api/providers'); } catch { prov = {}; }
+  try { prov = await api('/api/providers'); } catch { prov = {}; } INV = prov.invite || '';
   const reg = mode === 'register', q = new URLSearchParams(location.search).get('error');
   $('#app').innerHTML = `<div class="auth">
   <aside class="brand"><div>${logo()}</div>
     <div><h1>Tu código Lua, a salvo del .get</h1><p class="lead">Subí tu script, copiá el loadstring y ejecutalo con Delta. Navegadores, bots de Discord y spies se quedan afuera.</p></div>
     <div class="term" aria-hidden="true"><div class="th">registro de accesos · /s/mi-script</div><div id="tl"></div></div>
-    <div class="bf"><span>Gratis</span><span>Hasta 5 scripts por cuenta</span><span>Estadísticas por semana</span></div></aside>
+    <div class="bf"><span>Gratis</span><span>Hasta 5 scripts por cuenta</span><span>Estadísticas por semana</span></div>${dcCard()}</aside>
   <section class="side"><div class="ca">
     <div class="seg" role="tablist"><button role="tab" data-m="login" aria-selected="${!reg}">Iniciar sesión</button><button role="tab" data-m="register" aria-selected="${reg}">Crear cuenta</button></div>
     <h2>${reg ? 'Creá tu cuenta' : 'Bienvenido de vuelta'}</h2><p class="sub">${reg ? 'Tardás menos de un minuto.' : 'Entrá para ver tus scripts y estadísticas.'}</p>
-    <div class="oa"><button class="btn" id="g" ${prov.google ? '' : 'disabled title="Google no está configurado"'}>${GOOGLE} Google</button><button class="btn" id="d" ${prov.discord ? '' : 'disabled title="Discord no está configurado"'}>${DISCORD} Discord</button></div>
+    <div class="oa"><button class="btn" id="g">${GOOGLE} Google</button><button class="btn" id="d">${DISCORD} Discord</button></div>
     <div class="or">o con tu usuario</div>
     <div class="al" id="al" role="alert" ${q ? '' : 'hidden'}>${esc(q || '')}</div>
     <form id="f" novalidate>
@@ -194,7 +200,7 @@ async function authView() {
         ${reg ? '<div class="str" id="st"><i></i><i></i><i></i><i></i></div>' : ''}<div class="msg ${reg ? 'h' : ''}" id="mp">${reg ? 'Mínimo 8 caracteres' : ''}</div></div>
       ${reg ? '<label class="chk"><input type="checkbox" id="tc"><span>Acepto las <button type="button" id="rl">reglas de uso</button> de la plataforma.</span></label>' : ''}
       <button class="btn pri w" id="go" type="submit">${reg ? 'Crear cuenta' : 'Entrar'}</button>
-    </form></div></section></div>`;
+    </form>${INV ? `<p class="sub" style="margin:1.2rem 0 0;text-align:center">¿Dudas? ${DISCORD.replace('width="18" height="18"', 'width="16" height="16" style="vertical-align:-3px"')} ${dcLink()}</p>` : ''}</div></section></div>`;
   if (q) history.replaceState(0, '', '/');
   $$('.seg button').forEach((b) => (b.onclick = () => { mode = b.dataset.m; authView(); }));
   $('#g').onclick = () => (location.href = '/auth/google'); $('#d').onclick = () => (location.href = '/auth/discord');
@@ -232,14 +238,14 @@ function rules() {
 const NAV = [['resumen', 'grid', 'Resumen'], ['scripts', 'code', 'Mis scripts'], ['guia', 'book', 'Cómo usar']];
 function shell(inner) {
   $('#app').innerHTML = `<div class="shell"><aside class="nav">${logo()}<nav aria-label="Principal">${NAV.map((n) => `<button data-a="nav" data-v="${n[0]}" ${view === n[0] ? 'aria-current="page"' : ''}>${ic(n[1])}<span>${n[2]}</span></button>`).join('')}</nav>
-    <div class="me"><div class="av">${esc(me.username[0].toUpperCase())}</div><div><b>${esc(me.username)}</b><small>${me.max} scripts máx.</small></div><button class="btn ghost sm" data-a="out" aria-label="Salir" title="Salir">${ic('out')}</button></div></aside>
-    <div><div class="mtop">${logo()}<button class="btn ghost sm" data-a="out" aria-label="Salir">${ic('out')}</button></div><main class="main">${inner}</main></div></div>`;
+    ${dcCard()}<div class="me"><div class="av">${esc(me.username[0].toUpperCase())}</div><div><b>${esc(me.username)}</b><small>${me.max} scripts máx.</small></div><button class="btn ghost sm" data-a="out" aria-label="Salir" title="Salir">${ic('out')}</button></div></aside>
+    <div><div class="mtop">${logo()}<span style="display:flex;gap:.5rem;align-items:center">${INV ? `<a class="dcl" href="${esc(INV)}" data-a="dc" aria-label="Copiar link de Discord">${DISCORD}</a>` : ''}<button class="btn ghost sm" data-a="out" aria-label="Salir">${ic('out')}</button></span></div><main class="main">${inner}</main></div></div>`;
 }
 const WEEK = 6048e5;
 const wl = (st) => st.weeks.map((_, i) => (i === 7 ? 'Esta sem.' : new Date(st.start + i * WEEK).toLocaleDateString('es', { day: 'numeric', month: 'short', timeZone: 'UTC' })));
 const plot = (st) => { const m = Math.max(1, ...st.weeks), l = wl(st); return `<div class="plot" role="img" aria-label="Ejecuciones por semana: ${st.weeks.join(', ')}">${st.weeks.map((v, i) => `<div title="${fmt(v)} ejecuciones"><span>${fmt(v)}</span><i style="height:${Math.max(3, Math.round((v / m) * 140))}px"></i><span>${l[i]}</span></div>`).join('')}</div>`; };
 const ago = (t) => { if (!t) return 'Sin ejecuciones'; const m = Math.floor((Date.now() - t) / 6e4); return m < 1 ? 'Hace instantes' : m < 60 ? `Hace ${m} min` : m < 1440 ? `Hace ${Math.floor(m / 60)} h` : `Hace ${Math.floor(m / 1440)} d`; };
-const badge = (s) => `<span class="bdg ${s.enabled ? '' : 'off'}">${s.enabled ? 'Activo' : 'Pausado'}</span>`;
+const badge = (s) => `<span class="bdg ${s.enabled ? '' : 'off'}">${s.enabled ? 'Activo' : 'Pausado'}</span>${s.private ? ' <span class="bdg">🔒 Privado</span>' : ''}`;
 const hasData = () => D.ov && D.list;
 
 function vResumen() {
@@ -257,7 +263,8 @@ function vScripts() {
   <button class="btn pri" data-a="new" ${l.length >= me.max ? 'disabled title="Llegaste al límite"' : ''}>${ic('plus')} Subir script</button></div>
   ${l.length ? l.map((s) => `<article class="card sc ${s.enabled ? '' : 'pause'}"><div class="sh"><h3>${esc(s.slug)} ${badge(s)}</h3><div class="met"><span><b>${fmt(s.total)}</b>ejecuciones</span><span>${ago(s.last)}</span><span><b>${fmt(s.blocked)}</b>bloqueados</span></div></div>
     <div class="ls"><code>${esc(s.loadstring)}</code><button class="btn" data-a="copy" data-id="${s.id}">${ic('copy', 16)} Copiar</button></div>
-    <div class="acts"><button class="btn sm" data-a="stats" data-id="${s.id}">${ic('chart', 16)} Estadísticas</button><button class="btn sm" data-a="edit" data-id="${s.id}">${ic('edit', 16)} Editar</button><a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noopener">${ic('eye', 16)} Ver página</a><span class="sp"></span>
+    ${s.private ? `<div class="kp"><span>Key:</span><code class="kc">${esc(s.skey)}</code><span class="bdg ${s.bound ? '' : 'off'}">${s.bound ? 'IP vinculada' : 'IP sin vincular'}</span><span class="sp"></span><button class="btn sm" data-a="ckey" data-id="${s.id}">Copiar key</button><button class="btn sm" data-a="lax" data-id="${s.id}" title="Si cambia la IP, la key sigue a la cuenta de Roblox que la reclamó">${s.lax ? 'Cambio de IP: misma cuenta ✓' : 'Cambio de IP: estricto'}</button><button class="btn sm" data-a="rip" data-id="${s.id}">Reiniciar IP</button><button class="btn sm dng" data-a="rkey" data-id="${s.id}">Nueva key</button></div>` : ''}
+    <div class="acts"><button class="btn sm" data-a="stats" data-id="${s.id}">${ic('chart', 16)} Estadísticas</button><button class="btn sm" data-a="edit" data-id="${s.id}">${ic('edit', 16)} Editar</button><a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noopener">${ic('eye', 16)} Ver página</a><button class="btn sm" data-a="priv" data-id="${s.id}">${s.private ? '🌐 Hacer público' : '🔒 Hacer privado'}</button><span class="sp"></span>
       <button class="sw" role="switch" aria-checked="${!!s.enabled}" aria-label="${s.enabled ? 'Pausar' : 'Activar'} ${esc(s.slug)}" data-a="tog" data-id="${s.id}"></button><button class="btn sm dng ghost" data-a="del" data-id="${s.id}" aria-label="Borrar ${esc(s.slug)}">${ic('trash', 16)}</button></div></article>`).join('')
   : `<div class="emp"><h3>Acá van a aparecer tus scripts</h3><p>Pegá tu código, ponele un nombre y copiá el loadstring.</p><button class="btn pri" data-a="new">${ic('plus')} Subir mi primer script</button></div>`}`;
 }
@@ -270,10 +277,15 @@ function vGuia() {
   <div class="sec"><h3>Qué protege</h3><div class="prot">
    <div>${ic('shield')}<p><b>Anti .get y navegador</b><span>El navegador solo ve la página con el loadstring. Bots de Discord y clientes HTTP reciben un bloqueo.</span></p></div>
    <div>${ic('shield')}<p><b>Anti spy</b><span>Detecta HttpSpy, SimpleSpy y herramientas parecidas antes de entregar el código.</span></p></div>
-   <div>${ic('shield')}<p><b>Abierto para todos</b><span>Cualquiera puede ejecutar tu script desde su executor: sin claves, tokens ni registro.</span></p></div>
+   <div>${ic('shield')}<p><b>Abierto para todos</b><span>Los scripts públicos los ejecuta cualquiera desde su executor, sin claves. Si querés controlarlo, hacelo privado.</span></p></div>
    <div>${ic('shield')}<p><b>Código cifrado</b><span>Viaja cifrado con una clave distinta en cada ejecución.</span></p></div>
    <div>${ic('shield')}<p><b>Bloqueo de intrusos</b><span>Los bots que insisten quedan bloqueados 15 minutos. Los executors nunca se bloquean.</span></p></div>
+   <div>${ic('shield')}<p><b>Scripts privados</b><span>Se ejecutan solo con tu key (<code>script_key="..."</code>). La reclama el primero que la usa y desde ahí solo corre él, las veces que quiera. Reiniciás la IP cuando quieras.</span></p></div>
+   <div>${ic('shield')}<p><b>Anti tamper + cifrado</b><span>Cifrado de flujo con clave distinta en cada pedido y suma de integridad: si lo modifican en el camino, no se ejecuta.</span></p></div>
+   <div>${ic('shield')}<p><b>Anti skid</b><span>Se registra el UserId de cada ejecución, podés bloquear cuentas por script y cada copia lleva una marca de agua invisible con su ID.</span></p></div>
+   <div>${ic('shield')}<p><b>Señuelo anti-dump</b><span>Si el entorno tiene spy o dumper, en vez de expulsar se entrega un código falso. Los castigos a bots suben de 15 min hasta 24 h.</span></p></div>
    <div>${ic('shield')}<p><b>Marca de agua</b><span>Cada ejecución lleva una marca oculta para rastrear filtraciones.</span></p></div></div></div>
+  ${INV ? `<div class="sec"><h3>Comunidad</h3>${dcCard()}</div>` : ''}
   <div class="sec"><p class="note"><b>Ojo:</b> ninguna protección es total. Para correr, el código tiene que quedar en claro dentro del executor, así que alguien con un executor que hookee <code>loadstring</code> todavía podría volcarlo. Si tu script vale mucho, ofuscalo antes de subirlo.</p></div>`;
 }
 const VIEWS = { resumen: vResumen, scripts: vScripts, guia: vGuia };
@@ -293,6 +305,7 @@ async function editor(s) {
   ${s ? '' : `<label for="n">Nombre del link</label><input id="n" placeholder="mi-script" maxlength="24" autocomplete="off" spellcheck="false"><div class="url">${esc(location.origin)}/s/<b id="pv">mi-script</b></div><div class="msg" id="mn"></div>`}
   <label for="c">Código Lua</label><div class="dz" id="dz"><textarea id="c" spellcheck="false" placeholder="-- pegá tu script o arrastrá un archivo .lua acá"></textarea></div>
   <div class="ft"><span id="ln">0 líneas</span><span id="sz">0 KB / 500 KB</span></div><div class="meter"><i id="mt"></i></div>
+  ${s ? '' : '<label class="chk" style="margin:.9rem 0 0"><input type="checkbox" id="prv"><span>Script privado: solo corre con tu key y queda ligado a una IP (la podés reiniciar cuando quieras)</span></label>'}
   <label for="f" style="display:flex;gap:.5rem;align-items:center">o cargá un archivo</label><input id="f" type="file" accept=".lua,.txt,text/plain">
   <div class="msg" id="e2" role="alert"></div><div class="da"><button class="btn" id="x">Cancelar</button><button class="btn pri" id="ok">${s ? 'Guardar cambios' : 'Crear loadstring'}</button></div></div>`;
   d.showModal();
@@ -308,7 +321,7 @@ async function editor(s) {
   $('#ok').onclick = async () => {
     const b = $('#ok'); b.disabled = true; b.classList.add('load'); $('#e2').textContent = '';
     try {
-      if (s) await api('/api/scripts/' + s.id, { method: 'PATCH', body: { content: c.value } }); else await api('/api/scripts', { method: 'POST', body: { name: $('#n').value, content: c.value } });
+      if (s) await api('/api/scripts/' + s.id, { method: 'PATCH', body: { content: c.value } }); else await api('/api/scripts', { method: 'POST', body: { name: $('#n').value, content: c.value, private: $('#prv').checked } });
       d.close(); toast(s ? 'Cambios guardados' : 'Script creado'); view = 'scripts'; await load(); paint();
     } catch (e) { $('#e2').textContent = e.message; b.disabled = false; b.classList.remove('load'); }
   };
@@ -316,8 +329,8 @@ async function editor(s) {
 async function stats(s) {
   const st = await api(`/api/scripts/${s.id}/stats`), d = $('#dlg');
   d.innerHTML = `<h3>${esc(s.slug)}</h3><div class="stats" style="grid-template-columns:repeat(4,1fr);gap:.6rem"><div class="card stat" style="grid-column:span 2"><span>Ejecuciones totales</span><b style="font-size:2.4rem">${fmt(st.total)}</b></div><div class="card stat"><span>Hoy</span><b>${fmt(st.today)}</b></div><div class="card stat"><span>Esta semana</span><b>${fmt(st.week)}</b></div></div>
-  <p style="color:var(--mu);margin:1rem 0 .5rem">Por semana · ${fmt(st.blocked)} accesos bloqueados en total</p>${plot(st)}<div class="da"><button class="btn" id="x">Cerrar</button></div>`;
-  d.showModal(); $('#x').onclick = () => d.close();
+  <p style="color:var(--mu);margin:1rem 0 .5rem">Por semana · ${fmt(st.blocked)} accesos bloqueados en total</p>${plot(st)}${st.recent && st.recent.length ? `<p style="color:var(--mu);margin:1.2rem 0 .4rem">Últimas ejecuciones (UserId de Roblox)</p><div style="display:grid;gap:.4rem;font:13px var(--mono)">${st.recent.map((r) => `<div style="display:flex;gap:.6rem;align-items:center"><a class="dcl" target="_blank" rel="noopener" href="https://www.roblox.com/users/${esc(r.rbx_id)}/profile">${esc(r.rbx_id)}</a><span style="color:var(--mu)">· ${ago(r.ts)}</span><span style="flex:1"></span><button class="btn sm dng" data-a="ban" data-id="${s.id}" data-u="${esc(r.rbx_id)}">Bloquear</button></div>`).join('')}</div>` : ''}${st.bans && st.bans.length ? `<p style="color:var(--mu);margin:1.2rem 0 .4rem">Usuarios bloqueados</p><div style="display:grid;gap:.4rem;font:13px var(--mono)">${st.bans.map((r) => `<div style="display:flex;gap:.6rem;align-items:center"><span>${esc(r.rbx_id)}</span><span style="flex:1"></span><button class="btn sm" data-a="unban" data-id="${s.id}" data-u="${esc(r.rbx_id)}">Quitar</button></div>`).join('')}</div>` : ''}<div class="da"><button class="btn" id="x">Cerrar</button></div>`;
+  if (!d.open) d.showModal(); $('#x').onclick = () => d.close();
 }
 
 /* ---------- Acciones ---------- */
@@ -326,18 +339,27 @@ const A = {
   new() { editor(); },
   out: async () => { if (!(await ask('¿Cerrar sesión?', 'Vas a salir de tu cuenta en este dispositivo. Tus scripts y estadísticas quedan guardados.', 'Cerrar sesión'))) return; try { await api('/api/logout', { method: 'POST' }); } catch {} setT(null); me = null; D = { ov: null, list: null }; mode = 'login'; authView(); },
   copy: (s) => { navigator.clipboard.writeText(s.loadstring).then(() => toast('Loadstring copiado'), () => toast('No pude copiar, seleccionalo a mano', 'err')); },
+  dc: async () => toast((await copyText(INV)) ? 'Link de Discord copiado' : 'No pude copiar, mantené presionado el link', ''),
+  priv: async (s) => { if (s.private && !(await ask('¿Hacer público el script?', 'Cualquiera podrá ejecutarlo sin key.', 'Hacer público'))) return; await api('/api/scripts/' + s.id, { method: 'PATCH', body: { private: !s.private } }); await load(); paint(); toast(s.private ? 'Ahora es público' : 'Ahora es privado: se ejecuta con tu key'); },
+  lax: async (s) => { await api('/api/scripts/' + s.id, { method: 'PATCH', body: { lax: !s.lax } }); await load(); paint(); toast(s.lax ? 'Modo estricto: solo la IP que la reclamó' : 'Si cambia la IP, la key sigue a la misma cuenta de Roblox'); },
+  ban: async (s, b) => { if (await ask('¿Bloquear este usuario?', `El UserId ${b.dataset.u} no podrá ejecutar “${s.slug}”.`, 'Bloquear', true)) { await api(`/api/scripts/${s.id}/ban`, { method: 'POST', body: { rbx_id: b.dataset.u } }); await stats(s); toast('Usuario bloqueado'); } },
+  unban: async (s, b) => { await api(`/api/scripts/${s.id}/ban/${b.dataset.u}`, { method: 'DELETE' }); await stats(s); toast('Usuario desbloqueado'); },
+  ckey: async (s) => toast((await copyText(s.skey)) ? 'Key copiada' : 'No pude copiar la key', ''),
+  rip: async (s) => { if (await ask('¿Reiniciar la IP?', 'La key queda libre y se vincula a la próxima IP que la use. Podés hacerlo las veces que quieras.', 'Reiniciar IP')) { await api('/api/scripts/' + s.id, { method: 'PATCH', body: { reset_ip: true } }); await load(); paint(); toast('IP reiniciada'); } },
+  rkey: async (s) => { if (await ask('¿Generar una key nueva?', 'La key actual deja de funcionar y se reinicia la IP. Quien la use tendrá que cambiarla.', 'Generar key', true)) { await api('/api/scripts/' + s.id, { method: 'PATCH', body: { regen_key: true } }); await load(); paint(); toast('Key nueva generada'); } },
   stats, edit: editor,
   tog: async (s) => { await api('/api/scripts/' + s.id, { method: 'PATCH', body: { enabled: !s.enabled } }); await load(); paint(); toast(s.enabled ? 'Script pausado' : 'Script activado'); },
   del: async (s) => { if (await ask(`⚠ ¿Borrar “${s.slug}”?`, `Se elimina el script y sus ${fmt(s.total)} ejecuciones registradas. Su loadstring dejará de funcionar para todos y NO se puede deshacer.`, 'Sí, borrar', true)) { await api('/api/scripts/' + s.id, { method: 'DELETE' }); await load(); paint(); toast('Script borrado'); } },
 };
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-a]'); if (!b || !A[b.dataset.a]) return;
+  if (b.dataset.a === 'dc') e.preventDefault();
   const s = D.list?.find((x) => x.id == b.dataset.id);
   try { await A[b.dataset.a](s, b); } catch (er) { toast(er.message, 'err'); }
 });
 document.addEventListener('click', (e) => { if (e.target.tagName === 'DIALOG' && e.target.id === 'dlg') e.target.close(); });
 
-async function boot() { try { me = await api('/api/me'); dash(); } catch { me = null; authView(); } }
+async function boot() { try { prov = await api('/api/providers'); INV = prov.invite || ''; } catch {} try { me = await api('/api/me'); dash(); } catch { me = null; authView(); } }
 boot();
 </script>
 </body>
