@@ -59,6 +59,7 @@ h1,h2,h3,p{margin:0}
 .dcl{color:#4da3ff;text-decoration:underline;word-break:break-all;cursor:pointer}.dcl:hover{color:#7bbcff}
 .dcc{display:flex;gap:.7rem;align-items:center;border:1px solid var(--ln);background:var(--rs);border-radius:12px;padding:.7rem .8rem}.dcc svg{flex:none;width:26px;height:26px}.dcc div{min-width:0;display:grid;line-height:1.3}.dcc small{color:var(--mu);font-size:.78rem}
 .kp{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin:0 0 .9rem;color:var(--mu);font-size:.9rem}.kp .sp{flex:1}.kc{font:13px var(--mono);color:var(--ok);background:var(--bg);border:1px solid var(--ln);border-radius:8px;padding:.2rem .5rem;user-select:all}
+.kp2{margin:0 0 .9rem;display:grid;gap:.5rem}.kh{display:flex;justify-content:space-between;align-items:center;color:var(--mu)}.kr{display:grid;gap:.55rem;border:1px solid var(--ln);background:var(--bg);border-radius:12px;padding:.7rem .8rem}.kr.off{opacity:.6}.ki{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}.ks{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;font-size:.85rem}.ka{display:flex;gap:.4rem;flex-wrap:wrap}
 .al{border:1px solid #6b2f3a;background:#2a1219;color:#ffb3b3;border-radius:10px;padding:.65rem .85rem;margin-bottom:1rem;font-size:.92rem}
 /* shell */
 .shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
@@ -263,7 +264,7 @@ function vScripts() {
   <button class="btn pri" data-a="new" ${l.length >= me.max ? 'disabled title="Llegaste al límite"' : ''}>${ic('plus')} Subir script</button></div>
   ${l.length ? l.map((s) => `<article class="card sc ${s.enabled ? '' : 'pause'}"><div class="sh"><h3>${esc(s.slug)} ${badge(s)}</h3><div class="met"><span><b>${fmt(s.total)}</b>ejecuciones</span><span>${ago(s.last)}</span><span><b>${fmt(s.blocked)}</b>bloqueados</span></div></div>
     <div class="ls"><code>${esc(s.loadstring)}</code><button class="btn" data-a="copy" data-id="${s.id}">${ic('copy', 16)} Copiar</button></div>
-    ${s.private ? `<div class="kp"><span>Key:</span><code class="kc">${esc(s.skey)}</code><span class="bdg ${s.bound ? '' : 'off'}">${s.bound ? 'IP vinculada' : 'IP sin vincular'}</span><span class="sp"></span><button class="btn sm" data-a="ckey" data-id="${s.id}">Copiar key</button><button class="btn sm" data-a="lax" data-id="${s.id}" title="Si cambia la IP, la key sigue a la cuenta de Roblox que la reclamó">${s.lax ? 'Cambio de IP: misma cuenta ✓' : 'Cambio de IP: estricto'}</button><button class="btn sm" data-a="rip" data-id="${s.id}">Reiniciar IP</button><button class="btn sm dng" data-a="rkey" data-id="${s.id}">Nueva key</button></div>` : ''}
+    ${s.private ? `<div class="kp2"><div class="kh"><b>Keys (${s.keys.length}/10)</b><button class="btn sm pri" data-a="knew" data-id="${s.id}" ${s.keys.length >= 10 ? 'disabled title="Máximo 10 keys"' : ''}>${ic('plus', 16)} Nueva key</button></div>${s.keys.map((k) => `<div class="kr${k.enabled ? '' : ' off'}"><div class="ki"><b>${esc(k.label || 'Key')}</b><code class="kc">${esc(k.k)}</code></div><div class="ks"><span class="bdg ${k.bound ? '' : 'off'}">${k.bound ? 'IP vinculada' : 'IP libre'}</span>${k.enabled ? '' : '<span class="bdg off">Desactivada</span>'}<span style="color:var(--mu)">${fmt(k.uses)} usos · ${k.last ? ago(k.last) : 'sin usar'}</span></div><div class="ka"><button class="btn sm" data-a="kcopy" data-id="${s.id}" data-k="${k.id}">Copiar loadstring</button><button class="btn sm" data-a="kip" data-id="${s.id}" data-k="${k.id}">Cambiar IP</button><button class="btn sm" data-a="kedit" data-id="${s.id}" data-k="${k.id}">Editar</button><button class="btn sm dng ghost" data-a="kdel" data-id="${s.id}" data-k="${k.id}" aria-label="Borrar key">${ic('trash', 16)}</button></div></div>`).join('')}</div>` : ''}
     <div class="acts"><button class="btn sm" data-a="stats" data-id="${s.id}">${ic('chart', 16)} Estadísticas</button><button class="btn sm" data-a="edit" data-id="${s.id}">${ic('edit', 16)} Editar</button><a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noopener">${ic('eye', 16)} Ver página</a><button class="btn sm" data-a="priv" data-id="${s.id}">${s.private ? '🌐 Hacer público' : '🔒 Hacer privado'}</button><span class="sp"></span>
       <button class="sw" role="switch" aria-checked="${!!s.enabled}" aria-label="${s.enabled ? 'Pausar' : 'Activar'} ${esc(s.slug)}" data-a="tog" data-id="${s.id}"></button><button class="btn sm dng ghost" data-a="del" data-id="${s.id}" aria-label="Borrar ${esc(s.slug)}">${ic('trash', 16)}</button></div></article>`).join('')
   : `<div class="emp"><h3>Acá van a aparecer tus scripts</h3><p>Pegá tu código, ponele un nombre y copiá el loadstring.</p><button class="btn pri" data-a="new">${ic('plus')} Subir mi primer script</button></div>`}`;
@@ -280,7 +281,7 @@ function vGuia() {
    <div>${ic('shield')}<p><b>Abierto para todos</b><span>Los scripts públicos los ejecuta cualquiera desde su executor, sin claves. Si querés controlarlo, hacelo privado.</span></p></div>
    <div>${ic('shield')}<p><b>Código cifrado</b><span>Viaja cifrado con una clave distinta en cada ejecución.</span></p></div>
    <div>${ic('shield')}<p><b>Bloqueo de intrusos</b><span>Los bots que insisten quedan bloqueados 15 minutos. Los executors nunca se bloquean.</span></p></div>
-   <div>${ic('shield')}<p><b>Scripts privados</b><span>Se ejecutan solo con tu key (<code>script_key="..."</code>). La reclama el primero que la usa y desde ahí solo corre él, las veces que quiera. Reiniciás la IP cuando quieras.</span></p></div>
+   <div>${ic('shield')}<p><b>Scripts privados</b><span>Se ejecutan solo con tu key (<code>script_key="..."</code>). Hasta 10 keys por script: cada una la reclama el primero que la usa y desde ahí solo corre él, las veces que quiera. Podés editarlas, borrarlas, desactivarlas y cambiar su IP cuando quieras.</span></p></div>
    <div>${ic('shield')}<p><b>Anti tamper + cifrado</b><span>Cifrado de flujo con clave distinta en cada pedido y suma de integridad: si lo modifican en el camino, no se ejecuta.</span></p></div>
    <div>${ic('shield')}<p><b>Anti skid</b><span>Se registra el UserId de cada ejecución, podés bloquear cuentas por script y cada copia lleva una marca de agua invisible con su ID.</span></p></div>
    <div>${ic('shield')}<p><b>Señuelo anti-dump</b><span>Si el entorno tiene spy o dumper, en vez de expulsar se entrega un código falso. Los castigos a bots suben de 15 min hasta 24 h.</span></p></div>
@@ -305,7 +306,7 @@ async function editor(s) {
   ${s ? '' : `<label for="n">Nombre del link</label><input id="n" placeholder="mi-script" maxlength="24" autocomplete="off" spellcheck="false"><div class="url">${esc(location.origin)}/s/<b id="pv">mi-script</b></div><div class="msg" id="mn"></div>`}
   <label for="c">Código Lua</label><div class="dz" id="dz"><textarea id="c" spellcheck="false" placeholder="-- pegá tu script o arrastrá un archivo .lua acá"></textarea></div>
   <div class="ft"><span id="ln">0 líneas</span><span id="sz">0 KB / 500 KB</span></div><div class="meter"><i id="mt"></i></div>
-  ${s ? '' : '<label class="chk" style="margin:.9rem 0 0"><input type="checkbox" id="prv"><span>Script privado: solo corre con tu key y queda ligado a una IP (la podés reiniciar cuando quieras)</span></label>'}
+  ${s ? '' : '<label class="chk" style="margin:.9rem 0 0"><input type="checkbox" id="prv"><span>Script privado: solo corre con una key (hasta 10 por script). Cada key la reclama la primera IP que la use</span></label>'}
   <label for="f" style="display:flex;gap:.5rem;align-items:center">o cargá un archivo</label><input id="f" type="file" accept=".lua,.txt,text/plain">
   <div class="msg" id="e2" role="alert"></div><div class="da"><button class="btn" id="x">Cancelar</button><button class="btn pri" id="ok">${s ? 'Guardar cambios' : 'Crear loadstring'}</button></div></div>`;
   d.showModal();
@@ -333,6 +334,22 @@ async function stats(s) {
   if (!d.open) d.showModal(); $('#x').onclick = () => d.close();
 }
 
+function keyEditor(s, k) {
+  const d = $('#dlg');
+  d.innerHTML = `<div class="edt"><h3>Editar key</h3><label for="kl">Nombre / nota</label><input id="kl" maxlength="30" value="${esc(k.label || '')}" placeholder="ej. Amigo Juan"><label for="kk">Key</label><div style="display:flex;gap:.5rem"><input id="kk" value="${esc(k.k)}" spellcheck="false" autocomplete="off"><button type="button" class="btn sm" id="kg">Generar</button></div><div class="url">6-40 caracteres: letras, números, _ o -</div>
+  <label class="chk" style="margin:1rem 0 .2rem"><input type="checkbox" id="ke" ${k.enabled ? 'checked' : ''}><span>Key activa</span></label>
+  <label class="chk"><input type="checkbox" id="kx" ${k.lax ? 'checked' : ''}><span>Si cambia la IP, que la key siga a la misma cuenta de Roblox que la reclamó</span></label>
+  <div class="msg" id="e2" role="alert"></div><div class="da"><button class="btn" id="x">Cancelar</button><button class="btn pri" id="ok">Guardar</button></div></div>`;
+  d.showModal(); $('#x').onclick = () => d.close();
+  $('#kg').onclick = () => { $('#kk').value = Array.from(crypto.getRandomValues(new Uint8Array(16)), (n) => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'[n % 56]).join(''); };
+  $('#ok').onclick = async () => { const b = $('#ok'); b.disabled = true; try { await api(`/api/scripts/${s.id}/keys/${k.id}`, { method: 'PATCH', body: { label: $('#kl').value, key: $('#kk').value.trim(), enabled: $('#ke').checked, lax: $('#kx').checked } }); d.close(); toast('Key guardada'); await load(); paint(); } catch (e) { $('#e2').textContent = e.message; b.disabled = false; } };
+}
+function ipEditor(s, k) {
+  const d = $('#dlg');
+  d.innerHTML = `<div class="edt"><h3>Cambiar IP de la key</h3><p style="color:var(--mu)">${k.bound ? 'Esta key está vinculada a una IP.' : 'Esta key todavía no tiene IP: la reclama el primero que la use.'} Escribí la IP que querés permitir, o dejá vacío para liberarla (la reclama la próxima IP que la use).</p><label for="ki">Nueva IP</label><input id="ki" placeholder="ej. 190.12.34.56" autocomplete="off" spellcheck="false" inputmode="decimal"><div class="msg" id="e2" role="alert"></div><div class="da"><button class="btn" id="x">Cancelar</button><button class="btn pri" id="ok">Guardar</button></div></div>`;
+  d.showModal(); $('#x').onclick = () => d.close(); $('#ki').focus();
+  $('#ok').onclick = async () => { const b = $('#ok'); b.disabled = true; try { await api(`/api/scripts/${s.id}/keys/${k.id}`, { method: 'PATCH', body: { set_ip: $('#ki').value.trim() } }); d.close(); toast($('#ki').value.trim() ? 'IP actualizada' : 'IP liberada'); await load(); paint(); } catch (e) { $('#e2').textContent = e.message; b.disabled = false; } };
+}
 /* ---------- Acciones ---------- */
 const A = {
   nav(_, b) { view = b.dataset.v; history.replaceState(0, '', '#' + view); dash(); },
@@ -341,12 +358,13 @@ const A = {
   copy: (s) => { navigator.clipboard.writeText(s.loadstring).then(() => toast('Loadstring copiado'), () => toast('No pude copiar, seleccionalo a mano', 'err')); },
   dc: async () => toast((await copyText(INV)) ? 'Link de Discord copiado' : 'No pude copiar, mantené presionado el link', ''),
   priv: async (s) => { if (s.private && !(await ask('¿Hacer público el script?', 'Cualquiera podrá ejecutarlo sin key.', 'Hacer público'))) return; await api('/api/scripts/' + s.id, { method: 'PATCH', body: { private: !s.private } }); await load(); paint(); toast(s.private ? 'Ahora es público' : 'Ahora es privado: se ejecuta con tu key'); },
-  lax: async (s) => { await api('/api/scripts/' + s.id, { method: 'PATCH', body: { lax: !s.lax } }); await load(); paint(); toast(s.lax ? 'Modo estricto: solo la IP que la reclamó' : 'Si cambia la IP, la key sigue a la misma cuenta de Roblox'); },
   ban: async (s, b) => { if (await ask('¿Bloquear este usuario?', `El UserId ${b.dataset.u} no podrá ejecutar “${s.slug}”.`, 'Bloquear', true)) { await api(`/api/scripts/${s.id}/ban`, { method: 'POST', body: { rbx_id: b.dataset.u } }); await stats(s); toast('Usuario bloqueado'); } },
   unban: async (s, b) => { await api(`/api/scripts/${s.id}/ban/${b.dataset.u}`, { method: 'DELETE' }); await stats(s); toast('Usuario desbloqueado'); },
-  ckey: async (s) => toast((await copyText(s.skey)) ? 'Key copiada' : 'No pude copiar la key', ''),
-  rip: async (s) => { if (await ask('¿Reiniciar la IP?', 'La key queda libre y se vincula a la próxima IP que la use. Podés hacerlo las veces que quieras.', 'Reiniciar IP')) { await api('/api/scripts/' + s.id, { method: 'PATCH', body: { reset_ip: true } }); await load(); paint(); toast('IP reiniciada'); } },
-  rkey: async (s) => { if (await ask('¿Generar una key nueva?', 'La key actual deja de funcionar y se reinicia la IP. Quien la use tendrá que cambiarla.', 'Generar key', true)) { await api('/api/scripts/' + s.id, { method: 'PATCH', body: { regen_key: true } }); await load(); paint(); toast('Key nueva generada'); } },
+  knew: async (s) => { await api(`/api/scripts/${s.id}/keys`, { method: 'POST', body: {} }); await load(); paint(); toast('Key creada'); },
+  kcopy: async (s, b) => { const k = s.keys.find((x) => x.id == b.dataset.k); toast((await copyText(`script_key="${k.k}"; loadstring(game:HttpGet("${s.url}"))()`)) ? 'Loadstring con key copiado' : 'No pude copiar', ''); },
+  kedit: (s, b) => keyEditor(s, s.keys.find((x) => x.id == b.dataset.k)),
+  kip: (s, b) => ipEditor(s, s.keys.find((x) => x.id == b.dataset.k)),
+  kdel: async (s, b) => { const k = s.keys.find((x) => x.id == b.dataset.k); if (await ask(`¿Borrar la key “${k.label || k.k}”?`, 'Quien la use dejará de poder ejecutar el script. No se puede deshacer.', 'Borrar key', true)) { await api(`/api/scripts/${s.id}/keys/${k.id}`, { method: 'DELETE' }); await load(); paint(); toast('Key borrada'); } },
   stats, edit: editor,
   tog: async (s) => { await api('/api/scripts/' + s.id, { method: 'PATCH', body: { enabled: !s.enabled } }); await load(); paint(); toast(s.enabled ? 'Script pausado' : 'Script activado'); },
   del: async (s) => { if (await ask(`⚠ ¿Borrar “${s.slug}”?`, `Se elimina el script y sus ${fmt(s.total)} ejecuciones registradas. Su loadstring dejará de funcionar para todos y NO se puede deshacer.`, 'Sí, borrar', true)) { await api('/api/scripts/' + s.id, { method: 'DELETE' }); await load(); paint(); toast('Script borrado'); } },
