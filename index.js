@@ -15,7 +15,7 @@ const BASE = (process.env.BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `http
 const BASE_DOMAIN = process.env.BASE_DOMAIN || ''; // opcional: habilita nombre.tudominio.com (requiere wildcard)
 const STRICT = process.env.ANTI_HOOK === 'strict';
 const PROD = BASE.startsWith('https');
-const MAX_SCRIPTS = 5;
+const MAX_SCRIPTS = 5, MAX_KEYS = 10;
 // Link de invitación de tu Discord (ponelo en Railway como DISCORD_INVITE, ej. https://discord.gg/tuinvite)
 const DC = (process.env.DISCORD_INVITE || 'https://discord.gg/qzeu6f8uG').trim();
 const DSVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="#5865F2" aria-hidden="true"><path d="M20.317 4.37a19.8 19.8 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .078-.01c3.928 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .079.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>';
@@ -41,6 +41,11 @@ try { db.exec('alter table execs add column place text'); } catch {}
 for (const c of ['private integer default 0', 'skey text', 'key_ip text', 'key_at integer', 'key_uid text', 'lax integer default 0']) { try { db.exec('alter table scripts add column ' + c); } catch {} }
 db.exec('create table if not exists meta(k text primary key, v text)');
 // Secreto de sesiones: JWT_SECRET, o uno generado y guardado en la base (así las sesiones sobreviven a reinicios)
+db.exec(`create table if not exists skeys(id integer primary key, script_id integer not null, k text unique not null, label text, key_ip text, key_uid text, key_at integer, lax integer default 0, enabled integer default 1, uses integer default 0, last integer, created integer);
+create index if not exists ix_sk on skeys(script_id);`);
+// migra las keys del modelo anterior (1 key por script) a la tabla nueva
+for (const r of db.prepare('select id, skey, key_ip, key_uid, key_at, lax from scripts where private=1 and skey is not null and not exists (select 1 from skeys where script_id=scripts.id)').all())
+  db.prepare('insert or ignore into skeys(script_id,k,label,key_ip,key_uid,key_at,lax,created) values(?,?,?,?,?,?,?,?)').run(r.id, r.skey, 'Key 1', r.key_ip, r.key_uid, r.key_at, r.lax || 0, Date.now());
 const SECRET = process.env.JWT_SECRET || db.prepare("select v from meta where k='jwt'").get()?.v || (() => { const v = crypto.randomBytes(32).toString('hex'); db.prepare("insert into meta(k,v) values('jwt',?)").run(v); return v; })();
 
 const app = express();
@@ -67,6 +72,7 @@ app.use(cookieParser());
 
 const KA = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
 const genKey = () => Array.from({ length: 16 }, () => KA[crypto.randomInt(KA.length)]).join('');
+const ipn = (ip) => String(ip || '').trim().replace(/^::ffff:/i, '').toLowerCase();
 const eq = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 const hash = (s) => crypto.createHash('sha256').update(s + SECRET).digest('hex').slice(0, 24);
 const lim = (windowMs, max) => rateLimit({ windowMs, max, standardHeaders: true, legacyHeaders: false, validate: false, keyGenerator: (req) => req.cip || req.ip, message: { error: 'Demasiados intentos, esperá un momento' } });
@@ -151,11 +157,12 @@ const urlFor = (slug, base = BASE) => (BASE_DOMAIN ? `https://${slug}.${BASE_DOM
 const own = (req) => db.prepare('select * from scripts where id=? and user_id=?').get(req.params.id, req.user.id);
 
 app.get('/api/scripts', apiLim, auth, (req, res) => {
-  const rows = db.prepare(`select s.id, s.slug, s.enabled, s.blocked, s.created, length(s.content) size, s.private, s.skey, s.lax, (s.key_ip is not null) bound, s.key_at,
+  const rows = db.prepare(`select s.id, s.slug, s.enabled, s.blocked, s.created, length(s.content) size, s.private,
     (select max(ts) from execs where script_id=s.id) last,
     (select count(*) from execs where script_id=s.id) total
     from scripts s where user_id=? order by id desc`).all(req.user.id);
-  res.json(rows.map((r) => ({ ...r, url: urlFor(r.slug, req.base), loadstring: (r.private ? `script_key="${r.skey}"; ` : '') + `loadstring(game:HttpGet("${urlFor(r.slug, req.base)}"))()` })));
+  const ks = {}; db.prepare('select id, script_id, k, label, (key_ip is not null) bound, key_at, lax, enabled, uses, last from skeys where script_id in (select id from scripts where user_id=?) order by id').all(req.user.id).forEach((k) => (ks[k.script_id] ||= []).push(k));
+  res.json(rows.map((r) => ({ ...r, keys: ks[r.id] || [], url: urlFor(r.slug, req.base), loadstring: (r.private ? `script_key="${ks[r.id]?.[0]?.k || 'TU_KEY'}"; ` : '') + `loadstring(game:HttpGet("${urlFor(r.slug, req.base)}"))()` })));
 });
 app.post('/api/scripts', apiLim, auth, (req, res) => {
   const slug = String(req.body?.name || '').toLowerCase(), content = req.body?.content;
@@ -164,21 +171,19 @@ app.post('/api/scripts', apiLim, auth, (req, res) => {
   if (db.prepare('select count(*) c from scripts where user_id=?').get(req.user.id).c >= MAX_SCRIPTS) return res.status(403).json({ error: `Llegaste al límite de ${MAX_SCRIPTS} scripts` });
   if (db.prepare('select 1 from scripts where slug=?').get(slug)) return res.status(409).json({ error: 'Ese nombre ya está en uso' });
   const priv = req.body?.private === true;
-  db.prepare('insert into scripts(user_id,slug,content,created,private,skey) values(?,?,?,?,?,?)').run(req.user.id, slug, content, Date.now(), priv ? 1 : 0, priv ? genKey() : null);
+  const ri = db.prepare('insert into scripts(user_id,slug,content,created,private) values(?,?,?,?,?)').run(req.user.id, slug, content, Date.now(), priv ? 1 : 0);
+  if (priv) db.prepare('insert into skeys(script_id,k,label,created) values(?,?,?,?)').run(ri.lastInsertRowid, genKey(), 'Key 1', Date.now());
   res.json({ ok: 1 });
 });
 app.patch('/api/scripts/:id', apiLim, auth, (req, res) => {
   const s = own(req); if (!s) return res.status(404).json({ error: 'No existe' });
-  const { content, enabled, private: pr, regen_key, reset_ip, lax } = req.body || {};
+  const { content, enabled, private: pr } = req.body || {};
   if (typeof content === 'string') {
     if (!content.trim() || content.length > 500000) return res.status(400).json({ error: 'Script inválido' });
     db.prepare('update scripts set content=? where id=?').run(content, s.id);
   }
   if (typeof enabled === 'boolean') db.prepare('update scripts set enabled=? where id=?').run(enabled ? 1 : 0, s.id);
-  if (typeof pr === 'boolean') { db.prepare('update scripts set private=?, skey=coalesce(skey, ?), key_ip=null, key_at=null where id=?').run(pr ? 1 : 0, genKey(), s.id); }
-  if (regen_key === true) db.prepare('update scripts set skey=?, key_ip=null, key_at=null where id=?').run(genKey(), s.id);
-  if (reset_ip === true) db.prepare('update scripts set key_ip=null, key_uid=null, key_at=null where id=?').run(s.id);
-  if (typeof lax === 'boolean') db.prepare('update scripts set lax=? where id=?').run(lax ? 1 : 0, s.id);
+  if (typeof pr === 'boolean') { db.prepare('update scripts set private=? where id=?').run(pr ? 1 : 0, s.id); if (pr && !db.prepare('select 1 from skeys where script_id=?').get(s.id)) db.prepare('insert into skeys(script_id,k,label,created) values(?,?,?,?)').run(s.id, genKey(), 'Key 1', Date.now()); }
   res.json({ ok: 1 });
 });
 app.get('/api/scripts/:id/content', apiLim, auth, (req, res) => { const s = own(req); s ? res.json({ content: s.content }) : res.status(404).json({ error: 'No existe' }); });
@@ -193,6 +198,35 @@ app.get('/api/scripts/:id/stats', apiLim, auth, (req, res) => {
   res.json({ ...weekStats('script_id=?', s.id), blocked: s.blocked, recent: db.prepare("select rbx_id, max(ts) ts from execs where script_id=? and rbx_id!='' group by rbx_id order by max(id) desc limit 8").all(s.id), bans: db.prepare('select rbx_id from bans where script_id=?').all(s.id) });
 });
 
+const ownKey = (req) => { const s = own(req); return { s, k: s && db.prepare('select * from skeys where id=? and script_id=?').get(req.params.kid, s.id) }; };
+app.post('/api/scripts/:id/keys', apiLim, auth, (req, res) => {
+  const s = own(req); if (!s) return res.status(404).json({ error: 'No existe' });
+  if (!s.private) return res.status(400).json({ error: 'Hacé el script privado primero' });
+  const n = db.prepare('select count(*) c from skeys where script_id=?').get(s.id).c;
+  if (n >= MAX_KEYS) return res.status(403).json({ error: `Máximo ${MAX_KEYS} keys por script` });
+  const label = String(req.body?.label || '').trim().slice(0, 30) || `Key ${n + 1}`;
+  db.prepare('insert into skeys(script_id,k,label,created) values(?,?,?,?)').run(s.id, genKey(), label, Date.now()); res.json({ ok: 1 });
+});
+app.patch('/api/scripts/:id/keys/:kid', apiLim, auth, (req, res) => {
+  const { k } = ownKey(req); if (!k) return res.status(404).json({ error: 'No existe' });
+  const b = req.body || {}, v = typeof b.set_ip === 'string' ? b.set_ip.trim() : null;
+  if (typeof b.key === 'string' && b.key !== k.k) {
+    if (!/^[A-Za-z0-9_-]{6,40}$/.test(b.key)) return res.status(400).json({ error: 'Key: 6-40 caracteres (letras, números, _ o -)' });
+    if (db.prepare('select 1 from skeys where k=?').get(b.key)) return res.status(409).json({ error: 'Esa key ya existe' });
+  }
+  if (v && !/^[0-9a-fA-F:.]{3,45}$/.test(v)) return res.status(400).json({ error: 'IP inválida' });
+  if (typeof b.label === 'string') db.prepare('update skeys set label=? where id=?').run(b.label.trim().slice(0, 30), k.id);
+  if (typeof b.key === 'string' && b.key !== k.k) db.prepare('update skeys set k=? where id=?').run(b.key, k.id);
+  if (typeof b.enabled === 'boolean') db.prepare('update skeys set enabled=? where id=?').run(b.enabled ? 1 : 0, k.id);
+  if (typeof b.lax === 'boolean') db.prepare('update skeys set lax=? where id=?').run(b.lax ? 1 : 0, k.id);
+  if (b.reset_ip === true || v === '') db.prepare('update skeys set key_ip=null, key_uid=null, key_at=null where id=?').run(k.id);
+  else if (v) db.prepare('update skeys set key_ip=?, key_at=? where id=?').run(hash(ipn(v)), Date.now(), k.id);
+  res.json({ ok: 1 });
+});
+app.delete('/api/scripts/:id/keys/:kid', apiLim, auth, (req, res) => {
+  const { k } = ownKey(req); if (!k) return res.status(404).json({ error: 'No existe' });
+  db.prepare('delete from skeys where id=?').run(k.id); res.json({ ok: 1 });
+});
 app.post('/api/scripts/:id/ban', apiLim, auth, (req, res) => {
   const s = own(req); if (!s) return res.status(404).json({ error: 'No existe' });
   const u = String(req.body?.rbx_id || ''); if (!/^\d{1,12}$/.test(u)) return res.status(400).json({ error: 'UserId inválido' });
@@ -355,19 +389,22 @@ app.get('/s/:slug/n/:tok', loadLim, (req, res) => {
   if (isBanned(req.cip)) return deny(res);
   const p = pend.get(req.params.tok); pend.delete(req.params.tok);
   const bad = !p || p.exp < Date.now() || isBrowser(req) || BOT_UA.test(req.headers['user-agent'] || '');
-  const s = !bad && db.prepare('select id, enabled, content, slug, private, skey, key_ip, key_uid, lax from scripts where id=?').get(p.sid);
+  const s = !bad && db.prepare('select id, enabled, content, slug, private from scripts where id=?').get(p.sid);
   if (bad || !s || !s.enabled || s.slug !== String(req.params.slug).toLowerCase()) { strike(req.cip); if (p) db.prepare('update scripts set blocked=blocked+1 where id=?').run(p.sid); return deny(res); }
   const er = (m) => res.type('text/plain').set('Cache-Control', 'no-store').send('ER' + m);
   const uid = /^\d{1,12}$/.test(String(req.query.u || '')) ? String(req.query.u) : '';
   if (uid && db.prepare('select 1 from bans where script_id=? and rbx_id=?').get(s.id, uid)) return er('Tu cuenta está bloqueada en este script');
   if (s.private) {
-    const k = String(req.query.k || ''), ih = hash(req.cip);
-    if (!k || !s.skey || !eq(k, s.skey)) { strike(req.cip); return er('Key inválida o faltante. Usá: script_key="TU_KEY"; loadstring(...)()'); }
-    if (s.key_ip && s.key_ip !== ih) {
+    const kk = String(req.query.k || ''), K = /^[A-Za-z0-9_-]{1,64}$/.test(kk) ? db.prepare('select * from skeys where script_id=? and k=?').get(s.id, kk) : null;
+    if (!K) { strike(req.cip); return er('Key inválida o faltante. Usá: script_key="TU_KEY"; loadstring(...)()'); }
+    if (!K.enabled) return er('Esta key está desactivada');
+    const ih = hash(ipn(req.cip));
+    if (K.key_ip && K.key_ip !== ih && K.key_ip !== hash(req.cip)) {
       // modo "misma cuenta": si cambió la IP pero es el mismo UserId que la reclamó, la key lo sigue
-      if (s.lax && uid && s.key_uid && uid === s.key_uid) db.prepare('update scripts set key_ip=? where id=?').run(ih, s.id);
+      if (K.lax && uid && K.key_uid && uid === K.key_uid) db.prepare('update skeys set key_ip=? where id=?').run(ih, K.id);
       else return er('Esta key ya fue reclamada por otra IP. Pedile al dueño que la reinicie.');
-    } else if (!s.key_ip) db.prepare('update scripts set key_ip=?, key_uid=?, key_at=? where id=?').run(ih, uid, Date.now(), s.id); // la reclama el primero que la usa
+    } else if (!K.key_ip) db.prepare('update skeys set key_ip=?, key_uid=?, key_at=? where id=?').run(ih, uid, Date.now(), K.id); // la reclama el primero que la usa
+    db.prepare('update skeys set uses=uses+1, last=? where id=?').run(Date.now(), K.id);
   }
   if (!p.eid) p.eid = db.prepare('insert into execs(script_id,ts,ip_hash,rbx_id,rbx_name,place) values(?,?,?,?,?,?)').run(s.id, Date.now(), hash(req.cip), '', '', '').lastInsertRowid;
   if (uid) db.prepare('update execs set rbx_id=? where id=?').run(uid, p.eid); // anti-skid: queda registrado quién lo ejecutó
