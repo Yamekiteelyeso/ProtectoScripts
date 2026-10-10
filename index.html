@@ -148,10 +148,14 @@ const LOC = () => (LANG === 'pt' ? 'pt-BR' : LANG);
 document.documentElement.lang = LOC();
 // [es, en, pt-BR, fr, de, it, ru, tr, id]
 const ROWS = [
-[`El archivo pesa más de 500 KB`,`The file is larger than 500 KB`,`O arquivo pesa mais de 500 KB`,`Le fichier dépasse 500 Ko`,`Die Datei ist größer als 500 KB`,`Il file supera i 500 KB`,`Файл весит более 500 КБ`,`Dosya 500 KB'tan büyük`,`File lebih dari 500 KB`],
+[`El archivo pesa más de 1 MB`,`The file is larger than 1 MB`,`O arquivo pesa mais de 1 MB`,`Le fichier dépasse 1 Mo`,`Die Datei ist größer als 1 MB`,`Il file supera i 1 MB`,`Файл весит более 500 КБ`,`Dosya 1 MB'tan büyük`,`File lebih dari 1 MB`],
 [`Mínimo 3 caracteres`,`At least 3 characters`,`Mínimo de 3 caracteres`,`3 caractères minimum`,`Mindestens 3 Zeichen`,`Almeno 3 caratteri`,`Минимум 3 символа`,`En az 3 karakter`,`Minimal 3 karakter`],
 [`Tus scripts`,`Your scripts`,`Seus scripts`,`Vos scripts`,`Deine Skripte`,`I tuoi script`,`Ваши скрипты`,`Scriptlerin`,`Skripmu`],
 [`Lexy Protect · Hosting protegido para tus scripts Lua`,`Lexy Protect · Protected hosting for your Lua scripts`,`Lexy Protect · Hospedagem protegida para seus scripts Lua`,`Lexy Protect · Hébergement protégé pour vos scripts Lua`,`Lexy Protect · Geschütztes Hosting für deine Lua-Skripte`,`Lexy Protect · Hosting protetto per i tuoi script Lua`,`Lexy Protect · Защищённый хостинг для ваших Lua-скриптов`,`Lexy Protect · Lua scriptlerin için korumalı barındırma`,`Lexy Protect · Hosting terlindungi untuk skrip Lua-mu`],
+[`Anti env logger`,`Anti env logger`,`Anti env logger`,`Anti env logger`,`Anti-Env-Logger`,`Anti env logger`,`Анти-env-логгер`,`Anti env logger`,`Anti env logger`],
+[`Detecta loggers de entorno y otras herramientas que espían las funciones del executor; si los encuentra entrega un código falso en vez del real.`,`Detects environment loggers and other tools that spy on the executor's functions; if it finds them, it delivers a fake code instead of the real one.`,`Detecta loggers de ambiente e outras ferramentas que espionam as funções do executor; se encontrar, entrega um código falso no lugar do real.`,`Détecte les loggers d'environnement et autres outils qui espionnent les fonctions de l'executor ; s'il en trouve, il livre un faux code à la place du vrai.`,`Erkennt Umgebungs-Logger und andere Tools, die Executor-Funktionen ausspionieren; findet es welche, wird ein falscher Code statt des echten ausgeliefert.`,`Rileva logger d'ambiente e altri strumenti che spiano le funzioni dell'executor; se li trova, consegna un codice falso al posto di quello vero.`,`Обнаруживает логгеры окружения и другие инструменты, следящие за функциями экзекьютора; если находит их, выдаёт ложный код вместо настоящего.`,`Ortam logger'larını ve executor fonksiyonlarını izleyen diğer araçları algılar; bulursa gerçek kod yerine sahte kod teslim eder.`,`Mendeteksi logger lingkungan dan alat lain yang memata-matai fungsi executor; jika ditemukan, kode palsu dikirim sebagai pengganti kode asli.`],
+[`Desafío anti .get`,`Anti .get challenge`,`Desafio anti .get`,`Défi anti .get`,`Anti-.get-Challenge`,`Sfida anti .get`,`Испытание анти-.get`,`.get karşıtı meydan okuma`,`Tantangan anti .get`],
+[`Para recibir el código, el loader debe resolver un desafío distinto en cada pedido. Copiar la URL o repetir la descarga a mano no sirve.`,`To receive the code, the loader must solve a different challenge on every request. Copying the URL or repeating the download by hand doesn't work.`,`Para receber o código, o loader precisa resolver um desafio diferente a cada pedido. Copiar a URL ou repetir o download manualmente não funciona.`,`Pour recevoir le code, le loader doit résoudre un défi différent à chaque requête. Copier l'URL ou refaire le téléchargement à la main ne fonctionne pas.`,`Um den Code zu erhalten, muss der Loader bei jeder Anfrage eine andere Aufgabe lösen. Die URL zu kopieren oder den Download von Hand zu wiederholen funktioniert nicht.`,`Per ricevere il codice, il loader deve risolvere una sfida diversa a ogni richiesta. Copiare l'URL o ripetere il download a mano non funziona.`,`Чтобы получить код, загрузчик должен решать новое испытание при каждом запросе. Скопировать URL или повторить загрузку вручную не получится.`,`Kodu almak için loader her istekte farklı bir meydan okumayı çözmelidir. URL'yi kopyalamak veya indirmeyi elle tekrarlamak işe yaramaz.`,`Untuk menerima kode, loader harus menyelesaikan tantangan berbeda di setiap permintaan. Menyalin URL atau mengulang unduhan secara manual tidak berhasil.`],
 [`Idioma`,`Language`,`Idioma`,`Langue`,`Sprache`,`Lingua`,`Язык`,`Dil`,`Bahasa`],
 [`Principal`,`Main`,`Principal`,`Principal`,`Hauptmenü`,`Principale`,`Главное меню`,`Ana menü`,`Utama`],
 [`Resumen`,`Overview`,`Resumo`,`Aperçu`,`Übersicht`,`Panoramica`,`Обзор`,`Genel bakış`,`Ringkasan`],
@@ -253,7 +257,7 @@ const ROWS = [
 [`Correo inválido`,`Invalid email`,`E-mail inválido`,`E-mail invalide`,`Ungültige E-Mail`,`Email non valida`,`Неверный email`,`Geçersiz e-posta`,`Email tidak valid`],
 [`Datos incorrectos`,`Incorrect credentials`,`Dados incorretos`,`Identifiants incorrects`,`Falsche Zugangsdaten`,`Dati non corretti`,`Неверные данные`,`Hatalı bilgiler`,`Data salah`],
 [`Demasiados intentos, esperá un momento`,`Too many attempts, wait a moment`,`Muitas tentativas, aguarde um momento`,`Trop de tentatives, patientez un instant`,`Zu viele Versuche, bitte kurz warten`,`Troppi tentativi, attendi un momento`,`Слишком много попыток, подождите немного`,`Çok fazla deneme, biraz bekle`,`Terlalu banyak percobaan, tunggu sebentar`],
-[`El script está vacío o pesa más de 500 KB`,`The script is empty or larger than 500 KB`,`O script está vazio ou pesa mais de 500 KB`,`Le script est vide ou dépasse 500 Ko`,`Das Skript ist leer oder größer als 500 KB`,`Lo script è vuoto o supera i 500 KB`,`Скрипт пуст или весит более 500 КБ`,`Script boş veya 500 KB'tan büyük`,`Skrip kosong atau lebih dari 500 KB`],
+[`El script está vacío o pesa más de 1 MB`,`The script is empty or larger than 1 MB`,`O script está vazio ou pesa mais de 1 MB`,`Le script est vide ou dépasse 1 Mo`,`Das Skript ist leer oder größer als 1 MB`,`Lo script è vuoto o supera i 1 MB`,`Скрипт пуст или весит более 500 КБ`,`Script boş veya 1 MB'tan büyük`,`Skrip kosong atau lebih dari 1 MB`],
 [`Esa key ya existe`,`That key already exists`,`Essa key já existe`,`Cette clé existe déjà`,`Dieser Key existiert bereits`,`Questa key esiste già`,`Такой ключ уже существует`,`Bu key zaten var`,`Key itu sudah ada`],
 [`Ese nombre ya está en uso`,`That name is already taken`,`Esse nome já está em uso`,`Ce nom est déjà utilisé`,`Dieser Name ist bereits vergeben`,`Questo nome è già in uso`,`Это имя уже занято`,`Bu ad zaten kullanımda`,`Nama itu sudah dipakai`],
 [`Hacé el script privado primero`,`Make the script private first`,`Torne o script privado primeiro`,`Rendez d'abord le script privé`,`Mache das Skript zuerst privat`,`Rendi prima privato lo script`,`Сначала сделайте скрипт приватным`,`Önce scripti özel yap`,`Jadikan skrip privat dulu`],
@@ -513,8 +517,8 @@ function rules() {
 /* ---------- Panel ---------- */
 const NAV = [['resumen', 'grid', 'Resumen'], ['scripts', 'code', 'Mis scripts'], ['guia', 'book', 'Cómo usar']];
 function shell(inner) {
-  $('#app').innerHTML = `<div class="shell"><aside class="nav">${logo()}<nav aria-label="Principal">${NAV.map((n) => `<button data-a="nav" data-v="${n[0]}" ${view === n[0] ? 'aria-current="page"' : ''}>${ic(n[1])}<span>${n[2]}</span></button>`).join('')}</nav>
-    ${dcCard()}<div style="margin:.7rem 0">${langSel()}</div><div class="me"><div class="av">${esc(me.username[0].toUpperCase())}</div><div><b>${esc(me.username)}</b><small>${me.max} scripts máx.</small></div><button class="btn ghost sm" data-a="out" aria-label="Salir" title="Salir">${ic('out')}</button></div></aside>
+  $('#app').innerHTML = `<div class="shell"><aside class="nav">${logo()}<nav aria-label="Principal">${(me.admin ? [...NAV, ['admin', 'shield', 'Admin']] : NAV).map((n) => `<button data-a="nav" data-v="${n[0]}" ${view === n[0] ? 'aria-current="page"' : ''}>${ic(n[1])}<span>${n[2]}</span></button>`).join('')}</nav>
+    ${dcCard()}<div style="margin:.7rem 0">${langSel()}</div><div class="me"><div class="av">${esc(me.username[0].toUpperCase())}</div><div><b>${esc(me.username)}</b><small>${me.admin ? 'Administrador' : `${me.max} scripts máx.`}</small></div><button class="btn ghost sm" data-a="out" aria-label="Salir" title="Salir">${ic('out')}</button></div></aside>
     <div><div class="mtop">${logo()}<span style="display:flex;gap:.5rem;align-items:center">${langSel()}${INV ? `<a class="dcl" href="${esc(INV)}" data-a="dc" aria-label="Copiar link de Discord">${DISCORD}</a>` : ''}<button class="btn ghost sm" data-a="out" aria-label="Salir">${ic('out')}</button></span></div><main class="main">${inner}</main></div></div>`;
 }
 const WEEK = 6048e5;
@@ -526,7 +530,7 @@ const hasData = () => D.ov && D.list;
 
 function vResumen() {
   const o = D.ov, l = D.list;
-  return `<div class="ph"><div><h1>Hola, ${esc(me.username)}</h1><p>Así van tus scripts.</p></div><button class="btn pri" data-a="new" ${l.length >= me.max ? 'disabled' : ''}>${ic('plus')} Subir script</button></div>
+  return `<div class="ph"><div><h1>Hola, ${esc(me.username)}</h1><p>Así van tus scripts.</p></div><button class="btn pri" data-a="new" ${me.max != null && l.length >= me.max ? 'disabled' : ''}>${ic('plus')} Subir script</button></div>
   <div class="stats"><div class="card stat"><span>Ejecuciones totales</span><b>${fmt(o.total)}</b></div><div class="card stat"><span>Hoy</span><b>${fmt(o.today)}</b></div>
    <div class="card stat"><span>Esta semana</span><b>${fmt(o.week)}</b><small>Semana pasada: ${fmt(o.weeks[6])}</small></div><div class="card stat"><span>Accesos bloqueados</span><b>${fmt(o.blocked)}</b></div></div>
   <div class="card ch"><div class="hd"><h3 style="color:var(--tx)">Ejecuciones por semana</h3><span>Últimas 8 semanas</span></div>${plot(o)}</div>
@@ -535,14 +539,31 @@ function vResumen() {
 }
 function vScripts() {
   const l = D.list;
-  return `<div class="ph"><div><h1>Mis scripts</h1><p class="slots"><span>${l.length} de ${me.max}</span><span class="slots"><span style="display:flex;gap:4px">${Array.from({ length: me.max }, (_, i) => `<i class="${i < l.length ? 'on' : ''}"></i>`).join('')}</span></span></p></div>
-  <button class="btn pri" data-a="new" ${l.length >= me.max ? 'disabled title="Llegaste al límite"' : ''}>${ic('plus')} Subir script</button></div>
+  return `<div class="ph"><div><h1>Mis scripts</h1><p class="slots">${me.max == null ? `<span>${l.length} scripts</span>` : `<span>${l.length} de ${me.max}</span><span class="slots"><span style="display:flex;gap:4px">${Array.from({ length: me.max }, (_, i) => `<i class="${i < l.length ? 'on' : ''}"></i>`).join('')}</span></span>`}</p></div>
+  <button class="btn pri" data-a="new" ${me.max != null && l.length >= me.max ? 'disabled title="Llegaste al límite"' : ''}>${ic('plus')} Subir script</button></div>
   ${l.length ? l.map((s) => `<article class="card sc ${s.enabled ? '' : 'pause'}"><div class="sh"><h3>${esc(s.slug)} ${badge(s)}</h3><div class="met"><span><b>${fmt(s.total)}</b>ejecuciones</span><span>${ago(s.last)}</span><span><b>${fmt(s.blocked)}</b>bloqueados</span></div></div>
     <div class="ls"><code>${esc(s.loadstring)}</code><button class="btn" data-a="copy" data-id="${s.id}">${ic('copy', 16)} Copiar</button></div>
     ${s.private ? `<div class="kp2"><div class="kh"><b>Keys (${s.keys.length}/10)</b><button class="btn sm pri" data-a="knew" data-id="${s.id}" ${s.keys.length >= 10 ? 'disabled title="Máximo 10 keys"' : ''}>${ic('plus', 16)} Nueva key</button></div>${s.keys.map((k) => `<div class="kr${k.enabled ? '' : ' off'}"><div class="ki"><b>${esc(k.label || 'Key')}</b><code class="kc">${esc(k.k)}</code></div><div class="ks"><span class="bdg ${k.bound ? '' : 'off'}">${k.bound ? 'IP vinculada' : 'IP libre'}</span>${k.enabled ? '' : '<span class="bdg off">Desactivada</span>'}<span style="color:var(--mu)">${fmt(k.uses)} usos · ${k.last ? ago(k.last) : 'sin usar'}</span></div><div class="ka"><button class="btn sm" data-a="kcopy" data-id="${s.id}" data-k="${k.id}">Copiar loadstring</button><button class="btn sm" data-a="kip" data-id="${s.id}" data-k="${k.id}">Cambiar IP</button><button class="btn sm" data-a="kedit" data-id="${s.id}" data-k="${k.id}">Editar</button><button class="btn sm dng ghost" data-a="kdel" data-id="${s.id}" data-k="${k.id}" aria-label="Borrar key">${ic('trash', 16)}</button></div></div>`).join('')}</div>` : ''}
     <div class="acts"><button class="btn sm" data-a="stats" data-id="${s.id}">${ic('chart', 16)} Estadísticas</button><button class="btn sm" data-a="edit" data-id="${s.id}">${ic('edit', 16)} Editar</button><a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noopener">${ic('eye', 16)} Ver página</a><button class="btn sm" data-a="priv" data-id="${s.id}">${s.private ? '🌐 Hacer público' : '🔒 Hacer privado'}</button><span class="sp"></span>
       <button class="sw" role="switch" aria-checked="${!!s.enabled}" aria-label="${s.enabled ? 'Pausar' : 'Activar'} ${esc(s.slug)}" data-a="tog" data-id="${s.id}"></button><button class="btn sm dng ghost" data-a="del" data-id="${s.id}" aria-label="Borrar ${esc(s.slug)}">${ic('trash', 16)}</button></div></article>`).join('')
   : `<div class="emp"><h3>Acá van a aparecer tus scripts</h3><p>Pegá tu código, ponele un nombre y copiá el loadstring.</p><button class="btn pri" data-a="new">${ic('plus')} Subir mi primer script</button></div>`}`;
+}
+let adminData = null;
+async function vAdmin() {
+  if (!adminData) { try { adminData = await api('/api/admin/stats'); } catch (e) { return `<div class="ph"><h1>Admin</h1></div><p style="color:var(--mu)">${esc(e.message)}</p>`; } }
+  const a = adminData, m = Math.max(1, ...a.days);
+  return `<div class="ph"><div><h1>Panel de administrador</h1><p>Cuentas ilimitadas, scripts ilimitados, keys ilimitadas.</p></div></div>
+  <div class="stats">
+   <div class="card stat"><span>Usuarios</span><b>${fmt(a.users)}</b><small>+${fmt(a.users_week)} esta semana</small></div>
+   <div class="card stat"><span>Scripts</span><b>${fmt(a.scripts)}</b><small>${fmt(a.scripts_active)} activos · ${fmt(a.scripts_private)} privados</small></div>
+   <div class="card stat"><span>Keys emitidas</span><b>${fmt(a.keys)}</b></div>
+   <div class="card stat"><span>Ejecuciones totales</span><b>${fmt(a.execs)}</b><small>${fmt(a.execs_today)} hoy</small></div>
+   <div class="card stat"><span>Ejecuciones (7 días)</span><b>${fmt(a.execs_week)}</b></div>
+   <div class="card stat"><span>Accesos bloqueados</span><b>${fmt(a.blocked)}</b><small>${fmt(a.bans)} usuarios bloqueados</small></div>
+  </div>
+  <div class="card ch"><div class="hd"><h3 style="color:var(--tx)">Ejecuciones por día</h3><span>Últimos 14 días</span></div><div class="plot" role="img">${a.days.map((v) => `<div title="${fmt(v)}"><span>${fmt(v)}</span><i style="height:${Math.max(3, Math.round((v / m) * 100))}%"></i></div>`).join('')}</div></div>
+  <div class="sec"><h3>Scripts más ejecutados</h3><div class="card" style="padding:.4rem .6rem;overflow-x:auto"><table class="tbl"><thead><tr><th>Script</th><th>Dueño</th><th class="r">Ejecuciones</th></tr></thead><tbody>${a.top.map((r) => `<tr><td>${esc(r.slug)}</td><td>${esc(r.owner)}</td><td class="r">${fmt(r.n)}</td></tr>`).join('') || `<tr><td colspan="3" style="color:var(--mu)">Sin datos</td></tr>`}</tbody></table></div></div>
+  <div class="sec"><h3>Usuarios recientes</h3><div class="card" style="padding:.4rem .6rem;overflow-x:auto"><table class="tbl"><thead><tr><th>Usuario</th><th>Rol</th><th class="r">Scripts</th><th class="r">Alta</th></tr></thead><tbody>${a.recent_users.map((u) => `<tr><td>${esc(u.username)}</td><td>${u.admin ? 'Admin' : 'Usuario'}</td><td class="r">${fmt(u.scripts)}</td><td class="r">${ago(u.created)}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
 function vGuia() {
   const ex = `loadstring(game:HttpGet("${location.origin}/s/mi-script"))()`;
@@ -560,13 +581,16 @@ function vGuia() {
    <div>${ic('shield')}<p><b>Anti tamper + cifrado</b><span>Cifrado de flujo con clave distinta en cada pedido y suma de integridad: si lo modifican en el camino, no se ejecuta.</span></p></div>
    <div>${ic('shield')}<p><b>Anti skid</b><span>Se registra el UserId de cada ejecución, podés bloquear cuentas por script y cada copia lleva una marca de agua invisible con su ID.</span></p></div>
    <div>${ic('shield')}<p><b>Señuelo anti-dump</b><span>Si el entorno tiene spy o dumper, en vez de expulsar se entrega un código falso. Los castigos a bots suben de 15 min hasta 24 h.</span></p></div>
+   <div>${ic('shield')}<p><b>Anti env logger</b><span>Detecta loggers de entorno y otras herramientas que espían las funciones del executor; si los encuentra entrega un código falso en vez del real.</span></p></div>
+   <div>${ic('shield')}<p><b>Desafío anti .get</b><span>Para recibir el código, el loader debe resolver un desafío distinto en cada pedido. Copiar la URL o repetir la descarga a mano no sirve.</span></p></div>
    <div>${ic('shield')}<p><b>Marca de agua</b><span>Cada ejecución lleva una marca oculta para rastrear filtraciones.</span></p></div></div></div>
   ${INV ? `<div class="sec"><h3>Comunidad</h3>${dcCard()}</div>` : ''}
   <div class="sec"><p class="note"><b>Ojo:</b> <span>ninguna protección es total. Para correr, el código tiene que quedar en claro dentro del executor, así que alguien con un executor que hookee loadstring todavía podría volcarlo. Si tu script vale mucho, ofuscalo antes de subirlo.</span></p></div>`;
 }
-const VIEWS = { resumen: vResumen, scripts: vScripts, guia: vGuia };
+const VIEWS = { resumen: vResumen, scripts: vScripts, guia: vGuia, admin: vAdmin };
 function paint() {
-  const need = view !== 'guia' && !hasData();
+  if (view === 'admin' && !me.admin) view = 'resumen';
+  const need = view !== 'guia' && view !== 'admin' && !hasData();
   shell(need ? '<div class="sk" style="height:60px;width:50%"></div><div class="sk"></div><div class="sk" style="height:220px"></div>' : VIEWS[view]());
 }
 async function load() { [D.ov, D.list] = await Promise.all([api('/api/overview'), api('/api/scripts')]); }
@@ -574,21 +598,21 @@ async function dash() { paint(); if (view !== 'guia' || !hasData()) { await load
 setInterval(async () => { if (me && view !== 'guia' && !$('#dlg').open && !$('#cf').open) { try { await load(); paint(); } catch {} } }, 20000);
 
 /* ---------- Editor y estadísticas ---------- */
-const MAXB = 500000;
+const MAXB = 1048576;
 async function editor(s) {
   const d = $('#dlg');
   d.innerHTML = `<div class="edt"><h3>${s ? 'Editar ' + esc(s.slug) : 'Subir script'}</h3>
   ${s ? '' : `<label for="n">Nombre del link</label><input id="n" placeholder="mi-script" maxlength="24" autocomplete="off" spellcheck="false"><div class="url">${esc(location.origin)}/s/<b id="pv">mi-script</b></div><div class="msg" id="mn"></div>`}
   <label for="c">Código Lua</label><div class="dz" id="dz"><textarea id="c" spellcheck="false" placeholder="-- pegá tu script o arrastrá un archivo .lua acá"></textarea></div>
-  <div class="ft"><span id="ln">0 líneas</span><span id="sz">0 KB / 500 KB</span></div><div class="meter"><i id="mt"></i></div>
+  <div class="ft"><span id="ln">0 líneas</span><span id="sz">0 KB / 1 MB</span></div><div class="meter"><i id="mt"></i></div>
   ${s ? '' : '<label class="chk" style="margin:.9rem 0 0"><input type="checkbox" id="prv"><span>Script privado: solo corre con una key (hasta 10 por script). Cada key la reclama la primera IP que la use</span></label>'}
   <label for="f" style="display:flex;gap:.5rem;align-items:center">o cargá un archivo</label><input id="f" type="file" accept=".lua,.txt,text/plain">
   <div class="msg" id="e2" role="alert"></div><div class="da"><button class="btn" id="x">Cancelar</button><button class="btn pri" id="ok">${s ? 'Guardar cambios' : 'Crear loadstring'}</button></div></div>`;
   d.showModal();
-  const c = $('#c'), upd = () => { const b = new Blob([c.value]).size; $('#ln').textContent = `${fmt(c.value ? c.value.split('\n').length : 0)} líneas`; $('#sz').textContent = `${(b / 1024).toFixed(1)} KB / 500 KB`; $('#mt').style.width = Math.min(100, (b / MAXB) * 100) + '%'; $('#mt').style.background = b > MAXB ? 'var(--er)' : ''; };
+  const c = $('#c'), upd = () => { const b = new Blob([c.value]).size; $('#ln').textContent = `${fmt(c.value ? c.value.split('\n').length : 0)} líneas`; $('#sz').textContent = `${(b / 1024).toFixed(1)} KB / 1 MB`; $('#mt').style.width = Math.min(100, (b / MAXB) * 100) + '%'; $('#mt').style.background = b > MAXB ? 'var(--er)' : ''; };
   c.oninput = upd;
   c.onkeydown = (e) => { if (e.key === 'Tab') { e.preventDefault(); const a = c.selectionStart; c.setRangeText('  ', a, c.selectionEnd, 'end'); upd(); } if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('#ok').click(); };
-  const read = (f) => { if (!f) return; if (f.size > MAXB) return (($('#e2').textContent = 'El archivo pesa más de 500 KB')); const r = new FileReader(); r.onload = () => { c.value = r.result; upd(); }; r.readAsText(f); };
+  const read = (f) => { if (!f) return; if (f.size > MAXB) return (($('#e2').textContent = 'El archivo pesa más de 1 MB')); const r = new FileReader(); r.onload = () => { c.value = r.result; upd(); }; r.readAsText(f); };
   $('#f').onchange = (e) => read(e.target.files[0]);
   const dz = $('#dz'); ['dragenter', 'dragover'].forEach((t) => dz.addEventListener(t, (e) => { e.preventDefault(); dz.classList.add('over'); })); ['dragleave', 'drop'].forEach((t) => dz.addEventListener(t, (e) => { e.preventDefault(); dz.classList.remove('over'); if (t === 'drop') read(e.dataTransfer.files[0]); }));
   if (!s) { const n = $('#n'); n.oninput = () => { n.value = n.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''); $('#pv').textContent = n.value || 'mi-script'; $('#mn').textContent = n.value && n.value.length < 3 ? 'Mínimo 3 caracteres' : ''; }; n.focus(); }
