@@ -526,7 +526,7 @@ const wl = (st) => st.weeks.map((_, i) => (i === 7 ? 'Esta sem.' : new Date(st.s
 const plot = (st) => { const m = Math.max(1, ...st.weeks), l = wl(st); return `<div class="plot" role="img" aria-label="Ejecuciones por semana: ${st.weeks.join(', ')}">${st.weeks.map((v, i) => `<div title="${fmt(v)} ejecuciones"><span>${fmt(v)}</span><i style="height:${Math.max(3, Math.round((v / m) * 140))}px"></i><span>${l[i]}</span></div>`).join('')}</div>`; };
 const ago = (t) => { if (!t) return 'Sin ejecuciones'; const m = Math.floor((Date.now() - t) / 6e4); return m < 1 ? 'Hace instantes' : m < 60 ? `Hace ${m} min` : m < 1440 ? `Hace ${Math.floor(m / 60)} h` : `Hace ${Math.floor(m / 1440)} d`; };
 const badge = (s) => `<span class="bdg ${s.enabled ? '' : 'off'}">${s.enabled ? 'Activo' : 'Pausado'}</span>${s.private ? ' <span class="bdg">🔒 Privado</span>' : ''}`;
-const hasData = () => D.ov && D.list;
+const hasData = () => D.ov && D.list && (!me.admin || D.admin !== undefined);
 
 function vResumen() {
   const o = D.ov, l = D.list;
@@ -548,10 +548,9 @@ function vScripts() {
       <button class="sw" role="switch" aria-checked="${!!s.enabled}" aria-label="${s.enabled ? 'Pausar' : 'Activar'} ${esc(s.slug)}" data-a="tog" data-id="${s.id}"></button><button class="btn sm dng ghost" data-a="del" data-id="${s.id}" aria-label="Borrar ${esc(s.slug)}">${ic('trash', 16)}</button></div></article>`).join('')
   : `<div class="emp"><h3>Acá van a aparecer tus scripts</h3><p>Pegá tu código, ponele un nombre y copiá el loadstring.</p><button class="btn pri" data-a="new">${ic('plus')} Subir mi primer script</button></div>`}`;
 }
-let adminData = null;
-async function vAdmin() {
-  if (!adminData) { try { adminData = await api('/api/admin/stats'); } catch (e) { return `<div class="ph"><h1>Admin</h1></div><p style="color:var(--mu)">${esc(e.message)}</p>`; } }
-  const a = adminData, m = Math.max(1, ...a.days);
+function vAdmin() {
+  if (!D.admin) return `<div class="ph"><div><h1>Panel de administrador</h1></div></div><p style="color:var(--mu)">No se pudieron cargar las estadísticas.</p>`;
+  const a = D.admin, m = Math.max(1, ...a.days);
   return `<div class="ph"><div><h1>Panel de administrador</h1><p>Cuentas ilimitadas, scripts ilimitados, keys ilimitadas.</p></div></div>
   <div class="stats">
    <div class="card stat"><span>Usuarios</span><b>${fmt(a.users)}</b><small>+${fmt(a.users_week)} esta semana</small></div>
@@ -590,15 +589,21 @@ function vGuia() {
 const VIEWS = { resumen: vResumen, scripts: vScripts, guia: vGuia, admin: vAdmin };
 function paint() {
   if (view === 'admin' && !me.admin) view = 'resumen';
-  const need = view !== 'guia' && view !== 'admin' && !hasData();
+  const need = (view !== 'guia' && !hasData()) || (view === 'admin' && !D.admin);
   shell(need ? '<div class="sk" style="height:60px;width:50%"></div><div class="sk"></div><div class="sk" style="height:220px"></div>' : VIEWS[view]());
 }
-async function load() { [D.ov, D.list] = await Promise.all([api('/api/overview'), api('/api/scripts')]); }
+async function load() {
+  const calls = [api('/api/overview'), api('/api/scripts')];
+  if (me.admin) calls.push(api('/api/admin/stats').catch(() => null));
+  const r = await Promise.all(calls);
+  D.ov = r[0]; D.list = r[1]; if (me.admin) D.admin = r[2];
+}
 async function dash() { paint(); if (view !== 'guia' || !hasData()) { await load(); paint(); } }
 setInterval(async () => { if (me && view !== 'guia' && !$('#dlg').open && !$('#cf').open) { try { await load(); paint(); } catch {} } }, 20000);
 
 /* ---------- Editor y estadísticas ---------- */
-const MAXB = 1048576;
+const MAXB = me.admin ? 100 * 1048576 : 1048576;
+const MAXL = () => (me.admin ? '100 MB' : '1 MB');
 async function editor(s) {
   const d = $('#dlg');
   d.innerHTML = `<div class="edt"><h3>${s ? 'Editar ' + esc(s.slug) : 'Subir script'}</h3>
@@ -609,10 +614,10 @@ async function editor(s) {
   <label for="f" style="display:flex;gap:.5rem;align-items:center">o cargá un archivo</label><input id="f" type="file" accept=".lua,.txt,text/plain">
   <div class="msg" id="e2" role="alert"></div><div class="da"><button class="btn" id="x">Cancelar</button><button class="btn pri" id="ok">${s ? 'Guardar cambios' : 'Crear loadstring'}</button></div></div>`;
   d.showModal();
-  const c = $('#c'), upd = () => { const b = new Blob([c.value]).size; $('#ln').textContent = `${fmt(c.value ? c.value.split('\n').length : 0)} líneas`; $('#sz').textContent = `${(b / 1024).toFixed(1)} KB / 1 MB`; $('#mt').style.width = Math.min(100, (b / MAXB) * 100) + '%'; $('#mt').style.background = b > MAXB ? 'var(--er)' : ''; };
+  const c = $('#c'), upd = () => { const b = new Blob([c.value]).size; $('#ln').textContent = `${fmt(c.value ? c.value.split('\n').length : 0)} líneas`; $('#sz').textContent = me.admin && b > 1048576 ? `${(b / 1048576).toFixed(1)} MB / ${MAXL()}` : `${(b / 1024).toFixed(1)} KB / ${MAXL()}`; $('#mt').style.width = Math.min(100, (b / MAXB) * 100) + '%'; $('#mt').style.background = b > MAXB ? 'var(--er)' : ''; };
   c.oninput = upd;
   c.onkeydown = (e) => { if (e.key === 'Tab') { e.preventDefault(); const a = c.selectionStart; c.setRangeText('  ', a, c.selectionEnd, 'end'); upd(); } if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('#ok').click(); };
-  const read = (f) => { if (!f) return; if (f.size > MAXB) return (($('#e2').textContent = 'El archivo pesa más de 1 MB')); const r = new FileReader(); r.onload = () => { c.value = r.result; upd(); }; r.readAsText(f); };
+  const read = (f) => { if (!f) return; if (f.size > MAXB) return (($('#e2').textContent = `El archivo pesa más de ${MAXL()}`)); const r = new FileReader(); r.onload = () => { c.value = r.result; upd(); }; r.readAsText(f); };
   $('#f').onchange = (e) => read(e.target.files[0]);
   const dz = $('#dz'); ['dragenter', 'dragover'].forEach((t) => dz.addEventListener(t, (e) => { e.preventDefault(); dz.classList.add('over'); })); ['dragleave', 'drop'].forEach((t) => dz.addEventListener(t, (e) => { e.preventDefault(); dz.classList.remove('over'); if (t === 'drop') read(e.dataTransfer.files[0]); }));
   if (!s) { const n = $('#n'); n.oninput = () => { n.value = n.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''); $('#pv').textContent = n.value || 'mi-script'; $('#mn').textContent = n.value && n.value.length < 3 ? 'Mínimo 3 caracteres' : ''; }; n.focus(); }
