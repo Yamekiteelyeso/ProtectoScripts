@@ -602,8 +602,8 @@ async function dash() { paint(); if (view !== 'guia' || !hasData()) { await load
 setInterval(async () => { if (me && view !== 'guia' && !$('#dlg').open && !$('#cf').open) { try { await load(); paint(); } catch {} } }, 20000);
 
 /* ---------- Editor y estadísticas ---------- */
-const MAXB = me.admin ? 100 * 1048576 : 1048576;
-const MAXL = () => (me.admin ? '100 MB' : '1 MB');
+const MAXB = () => (me && me.admin ? 100 * 1048576 : 1048576);
+const MAXL = () => (me && me.admin ? '100 MB' : '1 MB');
 async function editor(s) {
   const d = $('#dlg');
   d.innerHTML = `<div class="edt"><h3>${s ? 'Editar ' + esc(s.slug) : 'Subir script'}</h3>
@@ -614,10 +614,10 @@ async function editor(s) {
   <label for="f" style="display:flex;gap:.5rem;align-items:center">o cargá un archivo</label><input id="f" type="file" accept=".lua,.txt,text/plain">
   <div class="msg" id="e2" role="alert"></div><div class="da"><button class="btn" id="x">Cancelar</button><button class="btn pri" id="ok">${s ? 'Guardar cambios' : 'Crear loadstring'}</button></div></div>`;
   d.showModal();
-  const c = $('#c'), upd = () => { const b = new Blob([c.value]).size; $('#ln').textContent = `${fmt(c.value ? c.value.split('\n').length : 0)} líneas`; $('#sz').textContent = me.admin && b > 1048576 ? `${(b / 1048576).toFixed(1)} MB / ${MAXL()}` : `${(b / 1024).toFixed(1)} KB / ${MAXL()}`; $('#mt').style.width = Math.min(100, (b / MAXB) * 100) + '%'; $('#mt').style.background = b > MAXB ? 'var(--er)' : ''; };
+  const c = $('#c'), upd = () => { const b = new Blob([c.value]).size; $('#ln').textContent = `${fmt(c.value ? c.value.split('\n').length : 0)} líneas`; $('#sz').textContent = me.admin && b > 1048576 ? `${(b / 1048576).toFixed(1)} MB / ${MAXL()}` : `${(b / 1024).toFixed(1)} KB / ${MAXL()}`; $('#mt').style.width = Math.min(100, (b / MAXB()) * 100) + '%'; $('#mt').style.background = b > MAXB ? 'var(--er)' : ''; };
   c.oninput = upd;
   c.onkeydown = (e) => { if (e.key === 'Tab') { e.preventDefault(); const a = c.selectionStart; c.setRangeText('  ', a, c.selectionEnd, 'end'); upd(); } if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('#ok').click(); };
-  const read = (f) => { if (!f) return; if (f.size > MAXB) return (($('#e2').textContent = `El archivo pesa más de ${MAXL()}`)); const r = new FileReader(); r.onload = () => { c.value = r.result; upd(); }; r.readAsText(f); };
+  const read = (f) => { if (!f) return; if (f.size > MAXB()) return (($('#e2').textContent = `El archivo pesa más de ${MAXL()}`)); const r = new FileReader(); r.onload = () => { c.value = r.result; upd(); }; r.readAsText(f); };
   $('#f').onchange = (e) => read(e.target.files[0]);
   const dz = $('#dz'); ['dragenter', 'dragover'].forEach((t) => dz.addEventListener(t, (e) => { e.preventDefault(); dz.classList.add('over'); })); ['dragleave', 'drop'].forEach((t) => dz.addEventListener(t, (e) => { e.preventDefault(); dz.classList.remove('over'); if (t === 'drop') read(e.dataTransfer.files[0]); }));
   if (!s) { const n = $('#n'); n.oninput = () => { n.value = n.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''); $('#pv').textContent = n.value || 'mi-script'; $('#mn').textContent = n.value && n.value.length < 3 ? 'Mínimo 3 caracteres' : ''; }; n.focus(); }
